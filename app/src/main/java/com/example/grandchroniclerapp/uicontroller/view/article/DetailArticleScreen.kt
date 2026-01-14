@@ -86,7 +86,6 @@ fun DetailArticleScreen(
                                 .background(Color.LightGray)
                         ) {
                             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                                // Cek URL, tambahkan base url jika perlu
                                 val rawUrl = article.images[page]
                                 val fullUrl = if (rawUrl.startsWith("http")) rawUrl else "http://10.0.2.2:3000/uploads/$rawUrl"
 
@@ -98,7 +97,6 @@ fun DetailArticleScreen(
                                 )
                             }
 
-                            // Tombol Navigasi Slider (Kiri/Kanan)
                             if (article.images.size > 1) {
                                 if (pagerState.currentPage > 0) {
                                     IconButton(
@@ -112,7 +110,6 @@ fun DetailArticleScreen(
                                         modifier = Modifier.align(Alignment.CenterEnd).padding(8.dp).background(Color.Black.copy(0.3f), CircleShape)
                                     ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.White) }
                                 }
-                                // Indikator Halaman (1/3)
                                 Box(
                                     modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).background(Color.Black.copy(0.6f), RoundedCornerShape(16.dp)).padding(horizontal = 10.dp, vertical = 4.dp)
                                 ) {
@@ -126,49 +123,39 @@ fun DetailArticleScreen(
                         }
                     }
 
-                    // --- 2. KONTEN ARTIKEL ---
+                    // --- 2. KONTEN UTAMA ---
                     Column(modifier = Modifier.padding(16.dp)) {
                         // Kategori
                         Text(article.category_name ?: "Tanpa Kategori", color = PastelBluePrimary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
-
                         Spacer(Modifier.height(8.dp))
 
                         // Judul
                         Text(article.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-
                         Spacer(Modifier.height(16.dp))
 
-                        // Metadata Row (Penulis | Tanggal | Views)
+                        // Metadata (Penulis | Tanggal | Views)
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            // Penulis
                             Icon(Icons.Default.Person, null, Modifier.size(16.dp), tint = Color.Gray)
                             Spacer(Modifier.width(4.dp))
                             Text(article.author_name ?: "Unknown", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
 
                             Spacer(Modifier.width(16.dp))
 
-                            // Tanggal
                             Icon(Icons.Default.CalendarToday, null, Modifier.size(16.dp), tint = Color.Gray)
                             Spacer(Modifier.width(4.dp))
                             Text(article.published_at?.take(10) ?: "Draft", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
 
-                            // View Count
                             Spacer(Modifier.width(16.dp))
+
                             Icon(Icons.Default.Visibility, null, Modifier.size(16.dp), tint = Color.Gray)
                             Spacer(Modifier.width(4.dp))
                             Text("${article.views_count} x Dilihat", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                         }
 
-                        Divider(Modifier.padding(vertical = 20.dp))
-
-                        // Isi Artikel
-                        Text(article.content, style = MaterialTheme.typography.bodyLarge, lineHeight = 28.sp)
-
-                        // --- 3. TAGS / HASHTAG (PERBAIKAN ERROR BORDER) ---
+                        // --- 3. TAGS / HASHTAG (PINDAH KE ATAS) ---
+                        // Sekarang posisinya di sini: Di bawah Metadata, di atas Divider
                         if (!article.tags.isNullOrBlank()) {
-                            Spacer(modifier = Modifier.height(24.dp))
-                            Text("Topik Terkait:", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
                             val tagList = article.tags.split(" ", "\n").filter { it.isNotBlank() }
 
@@ -176,20 +163,25 @@ fun DetailArticleScreen(
                                 items(tagList) { tag ->
                                     SuggestionChip(
                                         onClick = { },
-                                        label = { Text(tag) },
+                                        label = { Text(tag, style = MaterialTheme.typography.labelSmall) },
                                         colors = SuggestionChipDefaults.suggestionChipColors(
                                             containerColor = PastelBluePrimary.copy(alpha = 0.1f),
                                             labelColor = PastelBluePrimary
                                         ),
-                                        // PERBAIKAN DI SINI: Gunakan enabled = true untuk border default atau BorderStroke manual
-                                        border = SuggestionChipDefaults.suggestionChipBorder(
-                                            enabled = true,
-                                            borderColor = PastelBluePrimary.copy(alpha = 0.5f)
-                                        )
+                                        // Menggunakan BorderStroke agar aman dari error versi
+                                        border = BorderStroke(1.dp, PastelBluePrimary.copy(alpha = 0.5f)),
+                                        shape = RoundedCornerShape(100) // Membuat chip lebih bulat cantik
                                     )
                                 }
                             }
                         }
+                        // ------------------------------------------
+
+                        Divider(Modifier.padding(vertical = 20.dp))
+
+                        // Isi Artikel
+                        Text(article.content, style = MaterialTheme.typography.bodyLarge, lineHeight = 28.sp)
+
                         Spacer(modifier = Modifier.height(50.dp))
                     }
                 }
