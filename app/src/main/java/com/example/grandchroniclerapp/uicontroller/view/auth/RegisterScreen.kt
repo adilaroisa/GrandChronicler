@@ -1,15 +1,15 @@
 package com.example.grandchroniclerapp.uicontroller.view.auth
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,11 +18,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.grandchroniclerapp.R
@@ -40,6 +44,7 @@ import kotlinx.coroutines.launch
 fun RegisterScreen(
     onRegisterSuccess: () -> Unit,
     onNavigateBack: () -> Unit,
+    onNavigateToTerms: () -> Unit,
     viewModel: RegisterViewModel = viewModel(factory = PenyediaViewModel.Factory)
 ) {
     val uiState = viewModel.registerUiState
@@ -47,22 +52,28 @@ fun RegisterScreen(
     val scope = rememberCoroutineScope()
     var passwordVisible by remember { mutableStateOf(false) }
 
-    // --- FUNGSI VALIDASI ---
-    fun isNameValid(name: String): Boolean {
-        // Hanya mengizinkan huruf, angka, dan spasi
-        val regex = Regex("^[a-zA-Z0-9 ]*$")
-        return name.matches(regex)
-    }
+    // State Checkbox Syarat & Ketentuan
+    var isTermsAccepted by remember { mutableStateOf(false) }
 
-    fun isEmailValid(email: String): Boolean {
-        // Menggunakan pengecekan simpel agar tidak error karena typo spasi atau domain unik
-        return email.contains("@") && email.contains(".")
-    }
+    // State untuk memicu tampilan error HANYA setelah tombol ditekan
+    var showErrors by remember { mutableStateOf(false) }
+
+    // --- LOGIKA VALIDASI ---
+    // 1. Nama: Tidak kosong & Alphanumeric spasi
+    val isNameValid = viewModel.fullName.isNotBlank() && viewModel.fullName.matches(Regex("^[a-zA-Z0-9 ]*$"))
+
+    // 2. Email: Ada @ dan .
+    val isEmailValid = viewModel.email.contains("@") && viewModel.email.contains(".")
+
+    // 3. Password: Min 8, Huruf + Angka
+    val hasLetter = viewModel.password.any { it.isLetter() }
+    val hasDigit = viewModel.password.any { it.isDigit() }
+    val isPasswordValid = viewModel.password.length >= 8 && hasLetter && hasDigit
 
     LaunchedEffect(uiState) {
         when (uiState) {
             is RegisterUiState.Success -> {
-                this.launch { snackbarHostState.showSnackbar("Registrasi Berhasil!") }
+                scope.launch { snackbarHostState.showSnackbar("Registrasi Berhasil!") }
                 delay(2000)
                 viewModel.resetState()
                 onRegisterSuccess()
@@ -71,7 +82,7 @@ fun RegisterScreen(
                 snackbarHostState.showSnackbar(uiState.message)
                 viewModel.resetState()
             }
-            else -> { /* Idle */ }
+            else -> {}
         }
     }
 
@@ -80,7 +91,7 @@ fun RegisterScreen(
             .fillMaxSize()
             .background(PastelBluePrimary)
     ) {
-        // 1. HEADER CENTER
+        // HEADER
         Box(
             modifier = Modifier
                 .weight(0.25f)
@@ -103,7 +114,7 @@ fun RegisterScreen(
             }
         }
 
-        // 2. SHEET FORM
+        // FORM SHEET
         Surface(
             modifier = Modifier
                 .weight(0.75f)
@@ -130,43 +141,51 @@ fun RegisterScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Input Nama
+                    // --- INPUT NAMA ---
                     OutlinedTextField(
                         value = viewModel.fullName,
                         onValueChange = { viewModel.updateFullName(it) },
-                        label = { Text(stringResource(R.string.full_name_label), style = MaterialTheme.typography.titleMedium) },
+                        label = { Text("Nama Lengkap") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
-                        textStyle = MaterialTheme.typography.bodyLarge
+                        // Error Merah HANYA jika tombol sudah ditekan DAN nama salah
+                        isError = showErrors && !isNameValid,
+                        trailingIcon = {
+                            if (showErrors && !isNameValid) Icon(Icons.Default.Warning, null, tint = SoftError)
+                        }
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Input Email
+                    // --- INPUT EMAIL ---
                     OutlinedTextField(
                         value = viewModel.email,
                         onValueChange = { viewModel.updateEmail(it) },
-                        label = { Text(stringResource(R.string.email_label), style = MaterialTheme.typography.titleMedium) },
+                        label = { Text("Email") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
-                        textStyle = MaterialTheme.typography.bodyLarge
+                        isError = showErrors && !isEmailValid,
+                        trailingIcon = {
+                            if (showErrors && !isEmailValid) Icon(Icons.Default.Warning, null, tint = SoftError)
+                        }
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Input Password
+                    // --- INPUT PASSWORD ---
                     OutlinedTextField(
                         value = viewModel.password,
                         onValueChange = { viewModel.updatePassword(it) },
-                        label = { Text(stringResource(R.string.password_label), style = MaterialTheme.typography.titleMedium) },
+                        label = { Text("Password") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        textStyle = MaterialTheme.typography.bodyLarge,
+                        // Error Merah jika tombol ditekan DAN password salah
+                        isError = showErrors && !isPasswordValid,
                         trailingIcon = {
                             val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -175,25 +194,63 @@ fun RegisterScreen(
                         }
                     )
 
+                    // (REMOVED: Helper Text di bawah password dihapus agar konsisten dengan field lain)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // --- CHECKBOX TERMS ---
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Checkbox(
+                            checked = isTermsAccepted,
+                            onCheckedChange = { isTermsAccepted = it },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = PastelBluePrimary,
+                                // Checkbox jadi merah jika lupa dicentang saat klik daftar
+                                uncheckedColor = if (showErrors && !isTermsAccepted) SoftError else Color.Gray
+                            )
+                        )
+
+                        val annotatedString = buildAnnotatedString {
+                            append("Saya menyetujui ")
+                            withStyle(style = SpanStyle(color = PastelBluePrimary, fontWeight = FontWeight.Bold, textDecoration = TextDecoration.Underline)) {
+                                append("Syarat & Ketentuan")
+                            }
+                            append(" yang berlaku.")
+                        }
+
+                        Text(
+                            text = annotatedString,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.clickable { onNavigateToTerms() },
+                            color = if (showErrors && !isTermsAccepted) SoftError else Color.Black
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Button Daftar
+                    // --- BUTTON DAFTAR ---
                     Button(
                         onClick = {
-                            // Menggunakan trim() untuk mencegah error validasi karena spasi
-                            val name = viewModel.fullName.trim()
-                            val email = viewModel.email.trim()
-                            val password = viewModel.password.trim()
+                            // 1. Saat diklik, aktifkan mode "Show Errors" (Border jadi merah jika salah)
+                            showErrors = true
 
-                            if (name.isBlank() || email.isBlank() || password.isBlank()) {
-                                scope.launch { snackbarHostState.showSnackbar("Semua kolom wajib diisi") }
-                            } else if (!isNameValid(name)) {
+                            // 2. Cek Validasi Satu per Satu untuk Snackbar
+                            if (viewModel.fullName.isBlank() || viewModel.email.isBlank() || viewModel.password.isBlank()) {
+                                scope.launch { snackbarHostState.showSnackbar("Semua kolom wajib diisi!") }
+                            } else if (!isNameValid) {
                                 scope.launch { snackbarHostState.showSnackbar("Nama hanya boleh huruf dan angka") }
-                            } else if (!isEmailValid(email)) {
-                                scope.launch { snackbarHostState.showSnackbar("Mohon masukkan format email yang benar (misal: nama@email.com)") }
-                            } else if (password.length < 6) {
-                                scope.launch { snackbarHostState.showSnackbar("Password minimal 6 karakter") }
+                            } else if (!isEmailValid) {
+                                scope.launch { snackbarHostState.showSnackbar("Format email salah") }
+                            } else if (!isPasswordValid) {
+                                // Pesan error password muncul di sini saja (Snackbar)
+                                scope.launch { snackbarHostState.showSnackbar("Password min. 8 karakter, kombinasi huruf & angka") }
+                            } else if (!isTermsAccepted) {
+                                scope.launch { snackbarHostState.showSnackbar("Anda wajib menyetujui Syarat & Ketentuan") }
                             } else {
+                                // 3. Jika Semua Lolos -> Register
                                 viewModel.register()
                             }
                         },
@@ -218,37 +275,22 @@ fun RegisterScreen(
                     Spacer(modifier = Modifier.height(40.dp))
                 }
 
-                // Snackbar Host (Floating)
+                // SNACKBAR
                 Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 20.dp)
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp)
                 ) {
                     SnackbarHost(hostState = snackbarHostState) { data ->
                         val isSuccess = data.visuals.message.contains("Berhasil", true)
-                        if (isSuccess) {
-                            Box(
-                                modifier = Modifier
-                                    .padding(16.dp)
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Brush.horizontalGradient(listOf(PastelBluePrimary, PastelPinkSecondary)))
-                                    .padding(16.dp)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White)
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(
-                                        text = data.visuals.message,
-                                        color = Color.White,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
+                        val bgColor = if (isSuccess) Brush.horizontalGradient(listOf(PastelBluePrimary, PastelPinkSecondary)) else Brush.linearGradient(listOf(SoftError, SoftError))
+
+                        Box(
+                            modifier = Modifier.padding(16.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(bgColor).padding(16.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(if(isSuccess) Icons.Default.CheckCircle else Icons.Default.Warning, null, tint = Color.White)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(data.visuals.message, color = Color.White, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
                             }
-                        } else {
-                            Snackbar(containerColor = SoftError, contentColor = Color.White, snackbarData = data)
                         }
                     }
                 }
