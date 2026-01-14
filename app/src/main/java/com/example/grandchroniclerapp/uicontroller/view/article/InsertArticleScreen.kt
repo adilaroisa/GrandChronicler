@@ -37,6 +37,7 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.grandchroniclerapp.ui.theme.PastelBluePrimary
 import com.example.grandchroniclerapp.ui.theme.PastelPinkSecondary
 import com.example.grandchroniclerapp.ui.theme.SoftError
+import com.example.grandchroniclerapp.viewmodel.article.ImageUploadState
 import com.example.grandchroniclerapp.viewmodel.article.InsertViewModel
 import com.example.grandchroniclerapp.viewmodel.article.UploadUiState
 import com.example.grandchroniclerapp.viewmodel.provider.PenyediaViewModel
@@ -57,7 +58,7 @@ fun InsertArticleScreen(
     var showDiscardDialog by remember { mutableStateOf(false) }
     var showDraftConfirmDialog by remember { mutableStateOf(false) }
     var showPublishConfirmDialog by remember { mutableStateOf(false) }
-    var imageToDeleteUri by remember { mutableStateOf<Uri?>(null) }
+    var imageToDelete by remember { mutableStateOf<ImageUploadState?>(null) }
     var expanded by remember { mutableStateOf(false) }
 
     val multipleImagePicker = rememberLauncherForActivityResult(contract = ActivityResultContracts.GetMultipleContents()) { uris -> viewModel.addImages(uris) }
@@ -80,13 +81,13 @@ fun InsertArticleScreen(
     }
 
     // --- DIALOGS ---
-    if (imageToDeleteUri != null) {
+    if (imageToDelete != null) {
         AlertDialog(
-            onDismissRequest = { imageToDeleteUri = null },
+            onDismissRequest = { imageToDelete = null },
             title = { Text("Hapus Gambar?") },
             text = { Text("Hapus gambar ini dari daftar upload?") },
-            confirmButton = { Button(onClick = { viewModel.removeImage(imageToDeleteUri!!); imageToDeleteUri = null }) { Text("Ya, Hapus") } },
-            dismissButton = { TextButton(onClick = { imageToDeleteUri = null }) { Text("Batal") } }
+            confirmButton = { Button(onClick = { viewModel.removeImage(imageToDelete!!); imageToDelete = null }) { Text("Ya, Hapus") } },
+            dismissButton = { TextButton(onClick = { imageToDelete = null }) { Text("Batal") } }
         )
     }
     if (showDiscardDialog) {
@@ -123,23 +124,91 @@ fun InsertArticleScreen(
             Surface(modifier = Modifier.fillMaxSize(), shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp), color = Color.White) {
                 Column(modifier = Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
 
-                    // FOTO
-                    Text("Foto Artikel (Opsional)", fontWeight = FontWeight.Bold, color = if(viewModel.imageUris.isEmpty()) Color.Gray else PastelBluePrimary)
+                    // FOTO & CAPTION
+                    Text("Foto Artikel & Caption", fontWeight = FontWeight.Bold, color = if(viewModel.imageList.isEmpty()) Color.Gray else PastelBluePrimary)
                     Spacer(Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth().height(120.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Box(modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(Color(0xFFF5F7FA)).border(1.dp, Color.LightGray, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                            if (viewModel.imageUris.isEmpty()) Text("No Foto", color = Color.Gray)
-                            else LazyRow(modifier = Modifier.fillMaxSize().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items(viewModel.imageUris) { uri ->
-                                    Box(modifier = Modifier.width(90.dp).fillMaxHeight()) {
-                                        Image(painter = rememberAsyncImagePainter(uri), contentDescription = null, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
-                                        IconButton(onClick = { imageToDeleteUri = uri }, modifier = Modifier.align(Alignment.TopEnd).padding(2.dp).size(20.dp).background(Color.White, CircleShape)) { Icon(Icons.Default.Close, null, tint = SoftError, modifier = Modifier.size(12.dp)) }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(220.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Area List Foto
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFFF5F7FA))
+                                .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (viewModel.imageList.isEmpty()) {
+                                Text("No Foto", color = Color.Gray)
+                            } else {
+                                LazyRow(
+                                    modifier = Modifier.fillMaxSize().padding(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    items(viewModel.imageList.size) { index ->
+                                        val item = viewModel.imageList[index]
+
+                                        // Card per item foto + caption
+                                        Column(
+                                            modifier = Modifier.width(140.dp).fillMaxHeight(),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            // Foto Wrapper
+                                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                                Image(
+                                                    painter = rememberAsyncImagePainter(item.uri),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                                IconButton(
+                                                    onClick = { imageToDelete = item },
+                                                    modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(24.dp).background(Color.White, CircleShape)
+                                                ) {
+                                                    Icon(Icons.Default.Close, null, tint = SoftError, modifier = Modifier.size(16.dp))
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(4.dp))
+
+                                            // Input Caption
+                                            OutlinedTextField(
+                                                value = item.caption,
+                                                onValueChange = { viewModel.updateCaption(index, it) },
+                                                placeholder = { Text("Caption...", fontSize = 10.sp) },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp),
+                                                singleLine = true,
+                                                shape = RoundedCornerShape(8.dp),
+                                                colors = OutlinedTextFieldDefaults.colors(
+                                                    unfocusedContainerColor = Color.White,
+                                                    focusedContainerColor = Color.White
+                                                )
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
-                        Box(modifier = Modifier.size(120.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFE0E0E0)).clickable { multipleImagePicker.launch("image/*") }, contentAlignment = Alignment.Center) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.AddPhotoAlternate, null, tint = PastelBluePrimary); Text("Add", color = PastelBluePrimary, fontSize = 12.sp) }
+
+                        // Tombol Tambah
+                        Box(
+                            modifier = Modifier
+                                .width(80.dp)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFFE0E0E0))
+                                .clickable { multipleImagePicker.launch("image/*") },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.AddPhotoAlternate, null, tint = PastelBluePrimary)
+                                Text("Add", color = PastelBluePrimary, fontSize = 12.sp)
+                            }
                         }
                     }
 
@@ -175,8 +244,7 @@ fun InsertArticleScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // --- INPUT TAGS (SOLUSI CARA MUDAH) ---
-                    // Ini memenuhi REQ-409 tanpa perlu codingan rumit
+                    // INPUT TAGS
                     OutlinedTextField(
                         value = viewModel.tags,
                         onValueChange = { viewModel.updateTags(it) },

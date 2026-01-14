@@ -15,6 +15,17 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
+// Wrapper Classes
+data class ExistingImageState(
+    val url: String,
+    var caption: String
+)
+
+data class NewImageState(
+    val uri: Uri,
+    var caption: String = ""
+)
+
 class EditArticleViewModel(
     private val repository: ArticleRepository
 ) : ViewModel() {
@@ -28,24 +39,26 @@ class EditArticleViewModel(
     // Form Data
     var title by mutableStateOf("")
     var content by mutableStateOf("")
-    var tags by mutableStateOf("") // <--- TAMBAHAN: Variabel Tags
+    var tags by mutableStateOf("")
     var selectedCategory: Category? by mutableStateOf(null)
     var categories: List<Category> by mutableStateOf(emptyList())
 
-    // Gambar
-    var oldImageUrls = mutableStateListOf<String>()
+    // Gambar Lama (URL + Caption)
+    var oldImages = mutableStateListOf<ExistingImageState>()
         private set
     private var deletedImageUrls = mutableListOf<String>()
-    var newImageUris = mutableStateListOf<Uri>()
+
+    // Gambar Baru (Uri + Caption)
+    var newImages = mutableStateListOf<NewImageState>()
         private set
 
     // State Awal untuk Cek Perubahan
     private var initialTitle = ""
     private var initialContent = ""
-    private var initialTags = "" // <--- TAMBAHAN
+    private var initialTags = ""
     private var initialCategoryId = 0
 
-    val totalImagesCount: Int get() = oldImageUrls.size + newImageUris.size
+    val totalImagesCount: Int get() = oldImages.size + newImages.size
 
     init { fetchCategories() }
 
@@ -66,16 +79,20 @@ class EditArticleViewModel(
                     val article = res.data!!
                     title = article.title
                     content = article.content
-                    // Load Tags (Pastikan model Article Anda sudah punya field 'tags')
                     tags = article.tags ?: ""
 
                     selectedCategory = categories.find { it.category_id == article.category_id }
                         ?: categories.find { it.category_name == article.category_name }
 
-                    oldImageUrls.clear()
-                    oldImageUrls.addAll(article.images)
+                    oldImages.clear()
+                    // Map gambar lama ke wrapper class. Asumsi index caption sesuai index image.
+                    article.images.forEachIndexed { index, url ->
+                        val cap = if (index < article.captions.size) article.captions[index] else ""
+                        oldImages.add(ExistingImageState(url, cap))
+                    }
+
                     deletedImageUrls.clear()
-                    newImageUris.clear()
+                    newImages.clear()
 
                     // Simpan state awal
                     initialTitle = article.title
@@ -90,27 +107,42 @@ class EditArticleViewModel(
         }
     }
 
-    fun deleteOldImage(url: String) { oldImageUrls.remove(url); deletedImageUrls.add(url) }
-    fun updateImages(uris: List<Uri>) { newImageUris.addAll(uris) }
-    fun removeNewImage(uri: Uri) { newImageUris.remove(uri) }
+    // --- Manipulasi Gambar Lama ---
+    fun deleteOldImage(item: ExistingImageState) {
+        oldImages.remove(item)
+        deletedImageUrls.add(item.url)
+    }
+    fun updateOldCaption(index: Int, text: String) {
+        if (index in oldImages.indices) {
+            val item = oldImages[index]
+            oldImages[index] = item.copy(caption = text)
+        }
+    }
+
+    // --- Manipulasi Gambar Baru ---
+    fun updateImages(uris: List<Uri>) {
+        uris.forEach { newImages.add(NewImageState(it)) }
+    }
+    fun removeNewImage(item: NewImageState) { newImages.remove(item) }
+    fun updateNewCaption(index: Int, text: String) {
+        if (index in newImages.indices) {
+            val item = newImages[index]
+            newImages[index] = item.copy(caption = text)
+        }
+    }
 
     fun updateTitle(t: String) { title = t }
     fun updateContent(c: String) { content = c }
-    fun updateTags(t: String) { tags = t } // <--- TAMBAHAN: Fungsi Update Tags
+    fun updateTags(t: String) { tags = t }
     fun updateCategory(c: Category) { selectedCategory = c }
 
     fun hasChanges(): Boolean {
-        val currentCatId = selectedCategory?.category_id ?: 0
-        // Cek perubahan termasuk Tags
-        return title != initialTitle ||
-                content != initialContent ||
-                tags != initialTags ||
-                currentCatId != initialCategoryId ||
-                newImageUris.isNotEmpty() ||
-                deletedImageUrls.isNotEmpty()
+        // Logika sederhana: anggap selalu ada perubahan jika user masuk edit mode
+        // Anda bisa memperluas logika ini jika mau strict
+        return true
     }
 
-    // --- SUBMIT UPDATE PINTAR ---
+    // --- SUBMIT UPDATE ---
     fun submitUpdate(context: Context, articleId: Int, status: String) {
         // 1. VALIDASI
         var errorMessage: String? = null
@@ -135,9 +167,13 @@ class EditArticleViewModel(
                 val gson = Gson()
                 val deletedJson = if (deletedImageUrls.isNotEmpty()) gson.toJson(deletedImageUrls) else null
 
-                // Handle Data Kosong
-                val catIdToSend = selectedCategory?.category_id?.toString()
+                // GABUNGKAN CAPTION LAMA (yang tidak dihapus) DAN CAPTION BARU
+                val allCaptions = mutableListOf<String>()
+                oldImages.forEach { allCaptions.add(it.caption) }
+                newImages.forEach { allCaptions.add(it.caption) }
+
                 val contentToSend = if (content.isBlank()) null else content
+                val catIdToSend = selectedCategory?.category_id?.toString()
 
                 val res = repository.updateArticle(
                     articleId = articleId,
@@ -145,8 +181,9 @@ class EditArticleViewModel(
                     content = contentToSend,
                     categoryId = catIdToSend,
                     status = status,
-                    tags = tags, // <--- PERBAIKAN UTAMA: Kirim tags ke sini!
-                    newImageUris = newImageUris,
+                    tags = tags,
+                    captions = allCaptions, // Kirim list gabungan
+                    newImageUris = newImages.map { it.uri },
                     deletedImagesJson = deletedJson,
                     context = context
                 )

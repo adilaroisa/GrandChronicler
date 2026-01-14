@@ -9,6 +9,7 @@ import com.example.grandchroniclerapp.model.CategoryResponse
 import com.example.grandchroniclerapp.model.DetailArticleResponse
 import com.example.grandchroniclerapp.model.UserDetailResponse
 import com.example.grandchroniclerapp.serviceapi.ApiService
+import com.google.gson.Gson
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -42,6 +43,7 @@ class ArticleRepository(private val apiService: ApiService) {
         userId: String,
         status: String,
         tags: String?,
+        captions: List<String>, // Parameter baru
         imageUris: List<Uri>,
         context: Context
     ): AddArticleResponse {
@@ -51,9 +53,15 @@ class ArticleRepository(private val apiService: ApiService) {
         val userPart = createPartFromString(userId)!!
         val statusPart = createPartFromString(status)!!
         val tagsPart = createPartFromString(tags)
+
+        // Convert List String ke JSON String untuk dikirim
+        val gson = Gson()
+        val captionsJson = gson.toJson(captions)
+        val captionsPart = createPartFromString(captionsJson)
+
         val imageParts = prepareImageParts(imageUris, context)
 
-        return apiService.addArticle(titlePart, contentPart, categoryPart, userPart, statusPart, tagsPart, imageParts)
+        return apiService.addArticle(titlePart, contentPart, categoryPart, userPart, statusPart, tagsPart, captionsPart, imageParts)
     }
 
     // Update Article
@@ -64,6 +72,7 @@ class ArticleRepository(private val apiService: ApiService) {
         categoryId: String?,
         status: String,
         tags: String?,
+        captions: List<String>, // Parameter baru (gabungan caption lama & baru)
         newImageUris: List<Uri>,
         deletedImagesJson: String?,
         context: Context
@@ -74,9 +83,15 @@ class ArticleRepository(private val apiService: ApiService) {
         val statusPart = createPartFromString(status)!!
         val tagsPart = createPartFromString(tags)
         val deletedPart = createPartFromString(deletedImagesJson)
+
+        // Convert List String ke JSON String
+        val gson = Gson()
+        val captionsJson = gson.toJson(captions)
+        val captionsPart = createPartFromString(captionsJson)
+
         val imageParts = prepareImageParts(newImageUris, context)
 
-        return apiService.updateArticle(articleId, titlePart, contentPart, categoryPart, statusPart, tagsPart, imageParts, deletedPart)
+        return apiService.updateArticle(articleId, titlePart, contentPart, categoryPart, statusPart, tagsPart, captionsPart, imageParts, deletedPart)
     }
 
     // --- USER (PROFIL) ---

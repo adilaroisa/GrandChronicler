@@ -38,6 +38,8 @@ import com.example.grandchroniclerapp.ui.theme.PastelBluePrimary
 import com.example.grandchroniclerapp.ui.theme.PastelPinkSecondary
 import com.example.grandchroniclerapp.ui.theme.SoftError
 import com.example.grandchroniclerapp.viewmodel.article.EditArticleViewModel
+import com.example.grandchroniclerapp.viewmodel.article.ExistingImageState
+import com.example.grandchroniclerapp.viewmodel.article.NewImageState
 import com.example.grandchroniclerapp.viewmodel.article.UploadUiState
 import com.example.grandchroniclerapp.viewmodel.provider.PenyediaViewModel
 import kotlinx.coroutines.delay
@@ -62,8 +64,8 @@ fun EditArticleScreen(
     var showDiscardDialog by remember { mutableStateOf(false) }
     var showDraftConfirmDialog by remember { mutableStateOf(false) }
     var showPublishConfirmDialog by remember { mutableStateOf(false) }
-    var imageToDeleteUrl by remember { mutableStateOf<String?>(null) }
-    var newImageToDeleteUri by remember { mutableStateOf<Uri?>(null) }
+    var oldImageToDelete by remember { mutableStateOf<ExistingImageState?>(null) }
+    var newImageToDelete by remember { mutableStateOf<NewImageState?>(null) }
     var expanded by remember { mutableStateOf(false) }
 
     val multipleImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { viewModel.updateImages(it) }
@@ -83,17 +85,17 @@ fun EditArticleScreen(
     }
 
     // --- DIALOGS ---
-    if (imageToDeleteUrl != null) {
-        AlertDialog(onDismissRequest = { imageToDeleteUrl = null },
-            title = { Text("Hapus Gambar?", color = SoftError) },
-            confirmButton = { Button(onClick = { viewModel.deleteOldImage(imageToDeleteUrl!!); imageToDeleteUrl = null }, colors = ButtonDefaults.buttonColors(containerColor = SoftError)) { Text("Hapus") } },
-            dismissButton = { OutlinedButton(onClick = { imageToDeleteUrl = null }) { Text("Batal") } })
+    if (oldImageToDelete != null) {
+        AlertDialog(onDismissRequest = { oldImageToDelete = null },
+            title = { Text("Hapus Gambar Lama?", color = SoftError) },
+            confirmButton = { Button(onClick = { viewModel.deleteOldImage(oldImageToDelete!!); oldImageToDelete = null }, colors = ButtonDefaults.buttonColors(containerColor = SoftError)) { Text("Hapus") } },
+            dismissButton = { OutlinedButton(onClick = { oldImageToDelete = null }) { Text("Batal") } })
     }
-    if (newImageToDeleteUri != null) {
-        AlertDialog(onDismissRequest = { newImageToDeleteUri = null },
+    if (newImageToDelete != null) {
+        AlertDialog(onDismissRequest = { newImageToDelete = null },
             title = { Text("Hapus Upload?", color = SoftError) },
-            confirmButton = { Button(onClick = { viewModel.removeNewImage(newImageToDeleteUri!!); newImageToDeleteUri = null }, colors = ButtonDefaults.buttonColors(containerColor = SoftError)) { Text("Hapus") } },
-            dismissButton = { OutlinedButton(onClick = { newImageToDeleteUri = null }) { Text("Batal") } })
+            confirmButton = { Button(onClick = { viewModel.removeNewImage(newImageToDelete!!); newImageToDelete = null }, colors = ButtonDefaults.buttonColors(containerColor = SoftError)) { Text("Hapus") } },
+            dismissButton = { OutlinedButton(onClick = { newImageToDelete = null }) { Text("Batal") } })
     }
     if (showDiscardDialog) {
         AlertDialog(onDismissRequest = { showDiscardDialog = false },
@@ -124,43 +126,71 @@ fun EditArticleScreen(
             Surface(modifier = Modifier.fillMaxSize(), shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp), color = Color.White) {
                 Column(modifier = Modifier.fillMaxSize().padding(20.dp).verticalScroll(scrollState)) {
 
-                    // 1. GAMBAR (LAMA & BARU)
-                    if (viewModel.oldImageUrls.isNotEmpty()) {
+                    // 1. GAMBAR LAMA + CAPTION
+                    if (viewModel.oldImages.isNotEmpty()) {
                         Text("Gambar Lama:", fontSize = 12.sp, color = Color.Gray)
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.height(100.dp)) {
-                            items(viewModel.oldImageUrls) { url ->
-                                val finalUrl = if (url.startsWith("http")) url else "http://10.0.2.2:3000/uploads/$url"
-                                Box(modifier = Modifier.width(100.dp)) {
-                                    AsyncImage(model = finalUrl, contentDescription = null, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
-                                    IconButton(onClick = { imageToDeleteUrl = url }, modifier = Modifier.align(Alignment.TopEnd).background(Color.White, CircleShape).size(24.dp)) { Icon(Icons.Default.Delete, null, tint = SoftError, modifier = Modifier.size(14.dp)) }
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.height(200.dp)) {
+                            items(viewModel.oldImages.size) { index ->
+                                val item = viewModel.oldImages[index]
+                                val finalUrl = if (item.url.startsWith("http")) item.url else "http://10.0.2.2:3000/uploads/${item.url}"
+
+                                Column(modifier = Modifier.width(140.dp)) {
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        AsyncImage(model = finalUrl, contentDescription = null, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                                        IconButton(onClick = { oldImageToDelete = item }, modifier = Modifier.align(Alignment.TopEnd).background(Color.White, CircleShape).size(24.dp)) { Icon(Icons.Default.Delete, null, tint = SoftError, modifier = Modifier.size(14.dp)) }
+                                    }
+                                    Spacer(Modifier.height(4.dp))
+                                    OutlinedTextField(
+                                        value = item.caption,
+                                        onValueChange = { viewModel.updateOldCaption(index, it) },
+                                        placeholder = { Text("Caption...") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp),
+                                        singleLine = true
+                                    )
                                 }
                             }
                         }
                         Spacer(Modifier.height(16.dp))
                     }
 
+                    // 2. GAMBAR BARU + CAPTION
                     Text("Tambah Baru:", fontSize = 12.sp, color = Color.Gray)
-                    Row(modifier = Modifier.height(120.dp).padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(modifier = Modifier.height(200.dp).padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Box(modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(Color(0xFFF5F7FA)).border(1.dp, Color.LightGray, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                            if (viewModel.newImageUris.isNotEmpty()) {
+                            if (viewModel.newImages.isNotEmpty()) {
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize().padding(8.dp)) {
-                                    items(viewModel.newImageUris) { uri ->
-                                        Box(modifier = Modifier.width(90.dp)) {
-                                            AsyncImage(model = uri, contentDescription = null, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
-                                            IconButton(onClick = { newImageToDeleteUri = uri }, modifier = Modifier.align(Alignment.TopEnd).padding(2.dp).size(20.dp).background(Color.White, CircleShape)) { Icon(Icons.Default.Close, null, tint = SoftError, modifier = Modifier.size(12.dp)) }
+                                    items(viewModel.newImages.size) { index ->
+                                        val item = viewModel.newImages[index]
+
+                                        Column(modifier = Modifier.width(140.dp)) {
+                                            Box(modifier = Modifier.weight(1f)) {
+                                                AsyncImage(model = item.uri, contentDescription = null, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                                                IconButton(onClick = { newImageToDelete = item }, modifier = Modifier.align(Alignment.TopEnd).padding(2.dp).size(20.dp).background(Color.White, CircleShape)) { Icon(Icons.Default.Close, null, tint = SoftError, modifier = Modifier.size(12.dp)) }
+                                            }
+                                            Spacer(Modifier.height(4.dp))
+                                            OutlinedTextField(
+                                                value = item.caption,
+                                                onValueChange = { viewModel.updateNewCaption(index, it) },
+                                                placeholder = { Text("Caption...") },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp),
+                                                singleLine = true
+                                            )
                                         }
                                     }
                                 }
                             } else { Text("Belum ada foto baru", color = Color.Gray, fontSize = 12.sp) }
                         }
-                        Box(modifier = Modifier.size(120.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFE0E0E0)).clickable { multipleImagePicker.launch("image/*") }, contentAlignment = Alignment.Center) {
+                        // Tombol Add
+                        Box(modifier = Modifier.size(120.dp).align(Alignment.CenterVertically).clip(RoundedCornerShape(12.dp)).background(Color(0xFFE0E0E0)).clickable { multipleImagePicker.launch("image/*") }, contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.AddPhotoAlternate, null, tint = PastelBluePrimary); Text("Add", color = PastelBluePrimary, fontSize = 12.sp) }
                         }
                     }
 
                     Spacer(Modifier.height(20.dp))
 
-                    // 2. FORM JUDUL
+                    // 3. FORM JUDUL
                     OutlinedTextField(
                         value = viewModel.title, onValueChange = { viewModel.updateTitle(it) },
                         label = { Text("Judul") }, modifier = Modifier.fillMaxWidth(),
@@ -168,7 +198,7 @@ fun EditArticleScreen(
                     )
                     Spacer(Modifier.height(16.dp))
 
-                    // 3. FORM KATEGORI
+                    // 4. FORM KATEGORI
                     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
                         OutlinedTextField(
                             value = viewModel.selectedCategory?.category_name ?: "Pilih Kategori",
@@ -182,10 +212,10 @@ fun EditArticleScreen(
                     }
                     Spacer(Modifier.height(16.dp))
 
-                    // 4. FORM TAGS (DITAMBAHKAN DI SINI)
+                    // 5. FORM TAGS
                     OutlinedTextField(
-                        value = viewModel.tags, // Bind ke ViewModel
-                        onValueChange = { viewModel.updateTags(it) }, // Update ViewModel
+                        value = viewModel.tags,
+                        onValueChange = { viewModel.updateTags(it) },
                         label = { Text("Tags / Hashtag (Opsional)") },
                         placeholder = { Text("Contoh: #Sejarah #Budaya") },
                         modifier = Modifier.fillMaxWidth(),
@@ -193,7 +223,7 @@ fun EditArticleScreen(
                     )
                     Spacer(Modifier.height(16.dp))
 
-                    // 5. FORM KONTEN
+                    // 6. FORM KONTEN
                     OutlinedTextField(
                         value = viewModel.content, onValueChange = { viewModel.updateContent(it) },
                         label = { Text("Isi Artikel") }, modifier = Modifier.fillMaxWidth().height(300.dp),
@@ -201,7 +231,7 @@ fun EditArticleScreen(
                     )
                     Spacer(Modifier.height(24.dp))
 
-                    // 6. TOMBOL AKSI
+                    // 7. TOMBOL AKSI
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(
                             onClick = { if (viewModel.title.isNotBlank()) showDraftConfirmDialog = true else viewModel.submitUpdate(context, articleId, "Draft") },

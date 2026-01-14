@@ -25,7 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -40,7 +42,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun DetailArticleScreen(
     navigateBack: () -> Unit,
-    onTagClick: (String) -> Unit,
+    onTagClick: (String) -> Unit, // Tetap ditambahkan agar klik tag berfungsi
     viewModel: DetailArticleViewModel = viewModel(factory = PenyediaViewModel.Factory)
 ) {
     val uiState = viewModel.detailUiState
@@ -76,16 +78,58 @@ fun DetailArticleScreen(
                         .padding(innerPadding)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    // --- HEADER GAMBAR SLIDER ---
+                    // --- 1. HEADER GAMBAR SLIDER ---
                     if (article.images.isNotEmpty()) {
                         val pagerState = rememberPagerState(pageCount = { article.images.size })
-                        Box(modifier = Modifier.fillMaxWidth().height(300.dp).background(Color.LightGray)) {
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(300.dp)
+                                .background(Color.LightGray)
+                        ) {
                             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                                val rawUrl = article.images[page]
-                                val fullUrl = if (rawUrl.startsWith("http")) rawUrl else "http://10.0.2.2:3000/uploads/$rawUrl"
-                                AsyncImage(model = fullUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    val rawUrl = article.images[page]
+                                    val fullUrl = if (rawUrl.startsWith("http")) rawUrl else "http://10.0.2.2:3000/uploads/$rawUrl"
+
+                                    // Gambar Utama
+                                    AsyncImage(
+                                        model = fullUrl,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+
+                                    // --- CAPTION KECIL & TRANSPARAN ---
+                                    // Mengambil caption berdasarkan halaman (page)
+                                    val caption = if (page < article.captions.size) article.captions[page] else ""
+
+                                    if (caption.isNotBlank()) {
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.BottomStart)
+                                                .padding(start = 12.dp, bottom = 12.dp, end = 60.dp) // Padding end agar tidak menabrak indikator halaman
+                                                .background(
+                                                    color = Color.Black.copy(alpha = 0.6f), // Hitam Transparan
+                                                    shape = RoundedCornerShape(8.dp)
+                                                )
+                                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                        ) {
+                                            Text(
+                                                text = caption,
+                                                color = Color.White,
+                                                style = MaterialTheme.typography.labelSmall, // Font Kecil
+                                                fontStyle = FontStyle.Italic,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
                             }
-                            // Navigasi Slider
+
+                            // Navigasi Slider (Panah Kiri Kanan)
                             if (article.images.size > 1) {
                                 if (pagerState.currentPage > 0) {
                                     IconButton(
@@ -99,6 +143,7 @@ fun DetailArticleScreen(
                                         modifier = Modifier.align(Alignment.CenterEnd).padding(8.dp).background(Color.Black.copy(0.3f), CircleShape)
                                     ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.White) }
                                 }
+                                // Indikator Halaman (Angka)
                                 Box(
                                     modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).background(Color.Black.copy(0.6f), RoundedCornerShape(16.dp)).padding(horizontal = 10.dp, vertical = 4.dp)
                                 ) {
@@ -112,37 +157,41 @@ fun DetailArticleScreen(
                         }
                     }
 
-                    // --- KONTEN ARTIKEL ---
+                    // --- 2. KONTEN UTAMA ---
                     Column(modifier = Modifier.padding(16.dp)) {
+                        // Kategori
+                        Text(article.category_name ?: "Tanpa Kategori", color = PastelBluePrimary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                        Spacer(Modifier.height(8.dp))
 
-                        // FIX: Sembunyikan label jika ID = 7 (Tanpa Kategori)
-                        if (article.category_id != 7 && article.category_name != "Tanpa Kategori") {
-                            Text(article.category_name, color = PastelBluePrimary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
-                            Spacer(Modifier.height(8.dp))
-                        }
-
+                        // Judul
                         Text(article.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(16.dp))
 
-                        // Metadata
+                        // Metadata (Penulis | Tanggal | Views)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Person, null, Modifier.size(16.dp), tint = Color.Gray)
                             Spacer(Modifier.width(4.dp))
                             Text(article.author_name ?: "Unknown", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+
                             Spacer(Modifier.width(16.dp))
+
                             Icon(Icons.Default.CalendarToday, null, Modifier.size(16.dp), tint = Color.Gray)
                             Spacer(Modifier.width(4.dp))
                             Text(article.published_at?.take(10) ?: "Draft", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+
                             Spacer(Modifier.width(16.dp))
+
                             Icon(Icons.Default.Visibility, null, Modifier.size(16.dp), tint = Color.Gray)
                             Spacer(Modifier.width(4.dp))
                             Text("${article.views_count} x Dilihat", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                         }
 
-                        // --- TAGS (POSISI ATAS) ---
+                        // --- 3. TAGS / HASHTAG ---
                         if (!article.tags.isNullOrBlank()) {
                             Spacer(modifier = Modifier.height(16.dp))
+
                             val tagList = article.tags.split(" ", "\n").filter { it.isNotBlank() }
+
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 items(tagList) { tag ->
                                     SuggestionChip(
@@ -160,7 +209,10 @@ fun DetailArticleScreen(
                         }
 
                         Divider(Modifier.padding(vertical = 20.dp))
+
+                        // Isi Artikel
                         Text(article.content, style = MaterialTheme.typography.bodyLarge, lineHeight = 28.sp)
+
                         Spacer(modifier = Modifier.height(50.dp))
                     }
                 }

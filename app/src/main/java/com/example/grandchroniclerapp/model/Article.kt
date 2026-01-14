@@ -11,6 +11,7 @@ data class Article(
     val content: String,
     // Field utama untuk menampung banyak gambar
     val images: List<String> = emptyList(),
+    val captions: List<String> = emptyList(),
     val created_at: String? = null,
     val published_at: String? = null,
     val views_count: Int = 0,

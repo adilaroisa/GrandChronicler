@@ -16,6 +16,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
+// Wrapper Class untuk Gambar + Caption
+data class ImageUploadState(
+    val uri: Uri,
+    var caption: String = ""
+)
+
 sealed interface UploadUiState {
     object Idle : UploadUiState
     object Loading : UploadUiState
@@ -37,11 +43,12 @@ class InsertViewModel(
     var title by mutableStateOf("")
     var content by mutableStateOf("")
     var selectedCategory: Category? by mutableStateOf(null)
-    // STATE TAGS (BARU)
     var tags by mutableStateOf("")
 
-    var imageUris = mutableStateListOf<Uri>()
+    // UBAH: Menggunakan List of ImageUploadState (Uri + Caption)
+    var imageList = mutableStateListOf<ImageUploadState>()
         private set
+
     var categories: List<Category> by mutableStateOf(emptyList())
         private set
 
@@ -61,12 +68,28 @@ class InsertViewModel(
     fun updateTitle(t: String) { title = t }
     fun updateContent(c: String) { content = c }
     fun updateCategory(c: Category) { selectedCategory = c }
-    fun updateTags(t: String) { tags = t } // Setter Tags
+    fun updateTags(t: String) { tags = t }
 
-    fun addImages(uris: List<Uri>) { imageUris.addAll(uris) }
-    fun removeImage(uri: Uri) { imageUris.remove(uri) }
+    // Update fungsi Add Images
+    fun addImages(uris: List<Uri>) {
+        uris.forEach { uri ->
+            imageList.add(ImageUploadState(uri))
+        }
+    }
 
-    fun hasUnsavedChanges(): Boolean = title.isNotEmpty() || content.isNotEmpty() || imageUris.isNotEmpty()
+    // Update fungsi Remove Image
+    fun removeImage(item: ImageUploadState) { imageList.remove(item) }
+
+    // Tambahan: Update Caption
+    fun updateCaption(index: Int, text: String) {
+        if (index in imageList.indices) {
+            // Perlu replace item agar Compose mendeteksi perubahan state pada properti var
+            val item = imageList[index]
+            imageList[index] = item.copy(caption = text)
+        }
+    }
+
+    fun hasUnsavedChanges(): Boolean = title.isNotEmpty() || content.isNotEmpty() || imageList.isNotEmpty()
 
     fun submitArticle(context: Context, status: String) {
         // Validasi
@@ -93,14 +116,19 @@ class InsertViewModel(
                     return@launch
                 }
 
+                // Pisahkan URI dan Caption untuk dikirim
+                val urisToSend = imageList.map { it.uri }
+                val captionsToSend = imageList.map { it.caption }
+
                 val response = repository.addArticle(
                     title = title,
                     content = if (content.isBlank()) null else content,
                     categoryId = selectedCategory?.category_id?.toString(),
                     userId = userId.toString(),
                     status = status,
-                    tags = tags, // KIRIM TAGS KE SERVER
-                    imageUris = imageUris,
+                    tags = tags,
+                    captions = captionsToSend,
+                    imageUris = urisToSend,
                     context = context
                 )
 
@@ -124,6 +152,6 @@ class InsertViewModel(
         content = ""
         tags = ""
         selectedCategory = null
-        imageUris.clear()
+        imageList.clear()
     }
 }
