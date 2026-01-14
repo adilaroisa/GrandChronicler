@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -33,7 +32,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.grandchroniclerapp.R
 import com.example.grandchroniclerapp.ui.theme.PastelBluePrimary
 import com.example.grandchroniclerapp.ui.theme.PastelPinkSecondary
 import com.example.grandchroniclerapp.ui.theme.SoftError
@@ -134,9 +132,15 @@ fun EditProfileScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             Spacer(modifier = Modifier.height(80.dp))
             Surface(modifier = Modifier.fillMaxSize(), shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp), color = Color.White) {
-                Column(modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp)
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
 
-                    // --- FOTO ---
+                    // --- FOTO PROFIL ---
                     Box(contentAlignment = Alignment.BottomEnd) {
                         Box(modifier = Modifier.size(110.dp).clip(CircleShape).background(Color.LightGray.copy(alpha = 0.3f)).clickable { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, contentAlignment = Alignment.Center) {
                             if (viewModel.selectedImageUri != null) {
@@ -200,13 +204,49 @@ fun EditProfileScreen(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
+                    // --- TOMBOL SIMPAN ---
+                    Button(
+                        onClick = {
+                            showErrors = true
+                            if (viewModel.fullName.isBlank() || viewModel.email.isBlank()) {
+                                scope.launch { snackbarHostState.showSnackbar("Nama dan Email wajib diisi") }
+                            } else if (!isNameValid) {
+                                scope.launch { snackbarHostState.showSnackbar("Nama hanya boleh huruf dan titik (.)") }
+                            } else if (!isPasswordValid) {
+                                scope.launch { snackbarHostState.showSnackbar("Password tidak memenuhi syarat keamanan") }
+                            } else {
+                                showSaveConfirmDialog = true
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PastelBluePrimary),
+                        enabled = uiState !is EditProfileUiState.Loading
+                    ) {
+                        if (uiState is EditProfileUiState.Loading) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        } else {
+                            Icon(Icons.Default.Save, null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Simpan Perubahan", fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
                     Divider(color = Color.LightGray.copy(alpha = 0.5f))
-                    TextButton(onClick = { showDeleteAccountDialog = true }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.textButtonColors(contentColor = SoftError)) {
+
+                    // --- TOMBOL HAPUS AKUN DI BAWAH DIVIDER ---
+                    TextButton(
+                        onClick = { showDeleteAccountDialog = true },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        colors = ButtonDefaults.textButtonColors(contentColor = SoftError)
+                    ) {
                         Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Hapus Akun Permanen")
                     }
-                    Spacer(modifier = Modifier.height(100.dp))
+
+                    Spacer(modifier = Modifier.height(50.dp))
                 }
             }
         }
@@ -215,29 +255,6 @@ fun EditProfileScreen(
         Row(modifier = Modifier.fillMaxWidth().height(80.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { onBackAttempt() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White) }
             Text("Edit Profil", style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
-        }
-
-        // FAB SIMPAN
-        Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.BottomEnd) {
-            FloatingActionButton(
-                onClick = {
-                    showErrors = true
-
-                    if (viewModel.fullName.isBlank() || viewModel.email.isBlank()) {
-                        scope.launch { snackbarHostState.showSnackbar("Nama dan Email wajib diisi") }
-                    } else if (!isNameValid) {
-                        // ERROR JIKA ADA ANGKA
-                        scope.launch { snackbarHostState.showSnackbar("Nama hanya boleh huruf dan titik (.)") }
-                    } else if (!isPasswordValid) {
-                        scope.launch { snackbarHostState.showSnackbar("Password tidak memenuhi syarat keamanan") }
-                    } else {
-                        showSaveConfirmDialog = true
-                    }
-                },
-                containerColor = PastelBluePrimary, contentColor = Color.White, shape = RoundedCornerShape(16.dp)
-            ) {
-                if (uiState is EditProfileUiState.Loading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp)) else Icon(Icons.Default.Check, "Simpan")
-            }
         }
 
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
