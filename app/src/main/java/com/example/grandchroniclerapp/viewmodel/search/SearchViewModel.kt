@@ -8,10 +8,10 @@ import androidx.lifecycle.viewModelScope
 import com.example.grandchroniclerapp.model.Article
 import com.example.grandchroniclerapp.model.Category
 import com.example.grandchroniclerapp.repository.ArticleRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.io.IOException
 
-// UI State Definition
 sealed interface SearchUiState {
     object Idle : SearchUiState
     object Loading : SearchUiState
@@ -27,8 +27,14 @@ class SearchViewModel(private val repository: ArticleRepository) : ViewModel() {
     var searchQuery by mutableStateOf("")
         private set
 
-    var categories: List<Category> by mutableStateOf(emptyList())
+    // Menyimpan kategori yang sedang dipilih
+    var selectedCategory: Category? by mutableStateOf(null)
         private set
+
+    var categories by mutableStateOf<List<Category>>(emptyList())
+        private set
+
+    private var searchJob: Job? = null
 
     init {
         fetchCategories()
@@ -39,40 +45,65 @@ class SearchViewModel(private val repository: ArticleRepository) : ViewModel() {
             try {
                 val response = repository.getCategories()
                 if (response.status) {
-                    // Filter kategori agar ID 7 (Tanpa Kategori) tidak masuk list
-                    categories = response.data.filter { it.category_id != 7 }
+                    categories = response.data
                 }
             } catch (e: Exception) {
-                // Kategori gagal dimuat, abaikan saja agar UI tidak crash
+                // Ignore error for categories currently
             }
         }
     }
 
+    // Fungsi 1: Saat user mengetik di Search Bar
     fun updateQuery(newQuery: String) {
         searchQuery = newQuery
+        selectedCategory = null
 
         if (newQuery.isBlank()) {
             searchUiState = SearchUiState.Idle
-        } else {
-            performSearch(newQuery)
+            return
+        }
+
+        // Debounce
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            delay(500)
+            searchArticles()
         }
     }
 
-    private fun performSearch(query: String) {
+    // Fungsi 2: Saat user KLIK KATEGORI
+    fun selectCategory(category: Category) {
+        selectedCategory = category
+        searchQuery = ""
+        searchArticles()
+    }
+
+    // Fungsi Pencarian Utama
+    fun searchArticles() {
+        searchUiState = SearchUiState.Loading
         viewModelScope.launch {
-            searchUiState = SearchUiState.Loading
             try {
-                val response = repository.getArticles(query)
+                // Jika selectedCategory ada -> Kirim categoryId
+                // Jika tidak ada -> Kirim searchQuery (text)
+                val response = repository.getArticles(
+                    query = if (selectedCategory == null) searchQuery else null,
+                    categoryId = selectedCategory?.category_id
+                )
+
                 if (response.status) {
                     searchUiState = SearchUiState.Success(response.data ?: emptyList())
                 } else {
-                    searchUiState = SearchUiState.Error(response.message ?: "Gagal mencari artikel")
+                    searchUiState = SearchUiState.Error(response.message ?: "Gagal memuat")
                 }
-            } catch (e: IOException) {
-                searchUiState = SearchUiState.Error("Tidak ada koneksi internet")
             } catch (e: Exception) {
-                searchUiState = SearchUiState.Error("Terjadi kesalahan: ${e.message ?: "Kesalahan tidak diketahui"}")
+                searchUiState = SearchUiState.Error("Terjadi kesalahan: ${e.message}")
             }
         }
+    }
+
+    fun clearSearch() {
+        searchQuery = ""
+        selectedCategory = null
+        searchUiState = SearchUiState.Idle
     }
 }

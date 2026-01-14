@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun DetailArticleScreen(
     navigateBack: () -> Unit,
-    onTagClick: (String) -> Unit, // Callback klik Tag
+    onTagClick: (String) -> Unit,
     viewModel: DetailArticleViewModel = viewModel(factory = PenyediaViewModel.Factory)
 ) {
     val uiState = viewModel.detailUiState
@@ -76,22 +76,16 @@ fun DetailArticleScreen(
                         .padding(innerPadding)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    // --- 1. HEADER GAMBAR SLIDER ---
+                    // --- HEADER GAMBAR SLIDER ---
                     if (article.images.isNotEmpty()) {
                         val pagerState = rememberPagerState(pageCount = { article.images.size })
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(300.dp)
-                                .background(Color.LightGray)
-                        ) {
+                        Box(modifier = Modifier.fillMaxWidth().height(300.dp).background(Color.LightGray)) {
                             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                                 val rawUrl = article.images[page]
                                 val fullUrl = if (rawUrl.startsWith("http")) rawUrl else "http://10.0.2.2:3000/uploads/$rawUrl"
                                 AsyncImage(model = fullUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                             }
-
+                            // Navigasi Slider
                             if (article.images.size > 1) {
                                 if (pagerState.currentPage > 0) {
                                     IconButton(
@@ -118,10 +112,15 @@ fun DetailArticleScreen(
                         }
                     }
 
-                    // --- 2. KONTEN ARTIKEL ---
+                    // --- KONTEN ARTIKEL ---
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(article.category_name ?: "Tanpa Kategori", color = PastelBluePrimary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(8.dp))
+
+                        // FIX: Sembunyikan label jika ID = 7 (Tanpa Kategori)
+                        if (article.category_id != 7 && article.category_name != "Tanpa Kategori") {
+                            Text(article.category_name, color = PastelBluePrimary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                            Spacer(Modifier.height(8.dp))
+                        }
+
                         Text(article.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(16.dp))
 
@@ -140,20 +139,19 @@ fun DetailArticleScreen(
                             Text("${article.views_count} x Dilihat", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                         }
 
-                        // --- 3. TAGS / HASHTAG (POSISI ATAS) ---
+                        // --- TAGS (POSISI ATAS) ---
                         if (!article.tags.isNullOrBlank()) {
                             Spacer(modifier = Modifier.height(16.dp))
                             val tagList = article.tags.split(" ", "\n").filter { it.isNotBlank() }
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 items(tagList) { tag ->
                                     SuggestionChip(
-                                        onClick = { onTagClick(tag) }, // Navigasi ke Search
+                                        onClick = { onTagClick(tag) },
                                         label = { Text(tag, style = MaterialTheme.typography.labelSmall) },
                                         colors = SuggestionChipDefaults.suggestionChipColors(
                                             containerColor = PastelBluePrimary.copy(alpha = 0.1f),
                                             labelColor = PastelBluePrimary
                                         ),
-                                        // Fix Border Error
                                         border = BorderStroke(1.dp, PastelBluePrimary.copy(alpha = 0.5f)),
                                         shape = RoundedCornerShape(100)
                                     )

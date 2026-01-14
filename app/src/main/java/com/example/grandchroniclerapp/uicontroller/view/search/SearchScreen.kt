@@ -10,7 +10,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -40,19 +39,17 @@ import com.example.grandchroniclerapp.viewmodel.search.SearchViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
-    initialQuery: String? = null, // Tambahan parameter
+    initialQuery: String? = null,
     onDetailClick: (Int) -> Unit,
     viewModel: SearchViewModel = viewModel(factory = PenyediaViewModel.Factory)
 ) {
     val focusManager = LocalFocusManager.current
     val uiState = viewModel.searchUiState
 
-    // Trigger pencarian otomatis jika ada initialQuery (dari Tag)
+    // Handle initial query (dari Tag)
     LaunchedEffect(initialQuery) {
         if (!initialQuery.isNullOrBlank()) {
             viewModel.updateQuery(initialQuery)
-            // Asumsi viewModel.updateQuery atau state-nya memicu pencarian
-            // Jika tidak, panggil fungsi search viewModel di sini
         }
     }
 
@@ -61,12 +58,17 @@ fun SearchScreen(
         OutlinedTextField(
             value = viewModel.searchQuery,
             onValueChange = { viewModel.updateQuery(it) },
-            label = { Text("Cari Artikel Sejarah...") },
+            label = {
+                if (viewModel.selectedCategory != null)
+                    Text("Kategori: ${viewModel.selectedCategory!!.category_name}")
+                else
+                    Text("Cari Artikel Sejarah...")
+            },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             trailingIcon = {
-                if (viewModel.searchQuery.isNotEmpty()) {
+                if (viewModel.searchQuery.isNotEmpty() || viewModel.selectedCategory != null) {
                     IconButton(onClick = {
-                        viewModel.updateQuery("")
+                        viewModel.clearSearch()
                         focusManager.clearFocus()
                     }) {
                         Icon(Icons.Default.Close, contentDescription = "Hapus")
@@ -95,15 +97,14 @@ fun SearchScreen(
                 }
             }
             is SearchUiState.Success -> {
-                // HEADER HASIL PENCARIAN
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                ) {
-                    if (viewModel.searchQuery.isNotEmpty()) {
-                        // Tombol back kecil di hasil pencarian (opsional)
-                    }
-                    Text(text = "Hasil Pencarian:", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                // HEADER HASIL
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+                    val headerText = if (viewModel.selectedCategory != null)
+                        "Kategori: ${viewModel.selectedCategory!!.category_name}"
+                    else
+                        "Hasil Pencarian:"
+
+                    Text(text = headerText, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
 
                 if (uiState.articles.isEmpty()) {
@@ -131,7 +132,7 @@ fun SearchScreen(
                 }
             }
             is SearchUiState.Idle -> {
-                // TAMPILAN AWAL: KATEGORI
+                // --- KATEGORI GRID ---
                 Text(text = "Jelajahi Kategori", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -143,9 +144,10 @@ fun SearchScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(viewModel.categories) { category ->
+                        // FIX: Filter ID 7 (Tanpa Kategori) agar tidak muncul di sini
+                        items(viewModel.categories.filter { it.category_id != 7 }) { category ->
                             CategoryCard(categoryName = category.category_name) {
-                                viewModel.updateQuery(category.category_name)
+                                viewModel.selectCategory(category)
                             }
                         }
                     }
@@ -156,7 +158,6 @@ fun SearchScreen(
 }
 
 // --- KOMPONEN PENDUKUNG ---
-
 @Composable
 fun CategoryCard(categoryName: String, onClick: () -> Unit) {
     Card(
@@ -166,22 +167,13 @@ fun CategoryCard(categoryName: String, onClick: () -> Unit) {
         modifier = Modifier.height(60.dp).fillMaxWidth()
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                text = categoryName,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF4A4A4A)
-            )
+            Text(text = categoryName, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color(0xFF4A4A4A))
         }
     }
 }
 
 @Composable
-fun SearchArticleCard(
-    article: Article,
-    searchQuery: String,
-    onClick: () -> Unit
-) {
+fun SearchArticleCard(article: Article, searchQuery: String, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
@@ -191,45 +183,23 @@ fun SearchArticleCard(
         Column {
             if (article.images.isNotEmpty()) {
                 val imgUrl = if (article.images[0].startsWith("http")) article.images[0] else "http://10.0.2.2:3000/uploads/${article.images[0]}"
-                AsyncImage(
-                    model = imgUrl,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxWidth().height(100.dp),
-                    contentScale = ContentScale.Crop
-                )
+                AsyncImage(model = imgUrl, contentDescription = null, modifier = Modifier.fillMaxWidth().height(100.dp), contentScale = ContentScale.Crop)
             } else {
                 Box(modifier = Modifier.fillMaxWidth().height(100.dp).background(Color.LightGray))
             }
-
             Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = article.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(4.dp))
+                Text(text = article.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
 
-                // Snippet Highlight
-                val snippet = remember(article.content, searchQuery) {
-                    generateSearchSnippet(article.content, searchQuery)
+                if (searchQuery.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    val snippet = remember(article.content, searchQuery) { generateSearchSnippet(article.content, searchQuery) }
+                    Text(text = snippet, style = MaterialTheme.typography.bodySmall, fontSize = 11.sp, color = Color.Gray, maxLines = 3, overflow = TextOverflow.Ellipsis, lineHeight = 14.sp)
                 }
-                Text(
-                    text = snippet, // Menggunakan AnnotatedString
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 11.sp,
-                    color = Color.Gray,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                    lineHeight = 14.sp
-                )
             }
         }
     }
 }
 
-// Fungsi generateSearchSnippet sama seperti sebelumnya
 fun generateSearchSnippet(content: String, query: String): androidx.compose.ui.text.AnnotatedString {
     if (query.isBlank()) return buildAnnotatedString { append(content.take(80) + "...") }
     val index = content.indexOf(query, ignoreCase = true)
