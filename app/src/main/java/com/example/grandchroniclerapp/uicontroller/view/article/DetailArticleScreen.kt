@@ -1,7 +1,10 @@
 package com.example.grandchroniclerapp.uicontroller.view.article
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -149,11 +152,10 @@ fun DetailArticleScreen(
                             Spacer(Modifier.width(4.dp))
                             Text(article.published_at?.take(10) ?: "Draft", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
 
-                            // --- VIEW COUNT (DITAMBAHKAN DI SINI) ---
+                            // View Count
                             Spacer(Modifier.width(16.dp))
                             Icon(Icons.Default.Visibility, null, Modifier.size(16.dp), tint = Color.Gray)
                             Spacer(Modifier.width(4.dp))
-                            // Mengambil views_count dari objek article
                             Text("${article.views_count} x Dilihat", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                         }
 
@@ -161,6 +163,34 @@ fun DetailArticleScreen(
 
                         // Isi Artikel
                         Text(article.content, style = MaterialTheme.typography.bodyLarge, lineHeight = 28.sp)
+
+                        // --- 3. TAGS / HASHTAG (PERBAIKAN ERROR BORDER) ---
+                        if (!article.tags.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Text("Topik Terkait:", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            val tagList = article.tags.split(" ", "\n").filter { it.isNotBlank() }
+
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(tagList) { tag ->
+                                    SuggestionChip(
+                                        onClick = { },
+                                        label = { Text(tag) },
+                                        colors = SuggestionChipDefaults.suggestionChipColors(
+                                            containerColor = PastelBluePrimary.copy(alpha = 0.1f),
+                                            labelColor = PastelBluePrimary
+                                        ),
+                                        // PERBAIKAN DI SINI: Gunakan enabled = true untuk border default atau BorderStroke manual
+                                        border = SuggestionChipDefaults.suggestionChipBorder(
+                                            enabled = true,
+                                            borderColor = PastelBluePrimary.copy(alpha = 0.5f)
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(50.dp))
                     }
                 }
             }

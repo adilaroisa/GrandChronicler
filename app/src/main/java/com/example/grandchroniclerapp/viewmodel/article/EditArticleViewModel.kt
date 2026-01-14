@@ -28,6 +28,7 @@ class EditArticleViewModel(
     // Form Data
     var title by mutableStateOf("")
     var content by mutableStateOf("")
+    var tags by mutableStateOf("") // <--- TAMBAHAN: Variabel Tags
     var selectedCategory: Category? by mutableStateOf(null)
     var categories: List<Category> by mutableStateOf(emptyList())
 
@@ -38,8 +39,10 @@ class EditArticleViewModel(
     var newImageUris = mutableStateListOf<Uri>()
         private set
 
+    // State Awal untuk Cek Perubahan
     private var initialTitle = ""
     private var initialContent = ""
+    private var initialTags = "" // <--- TAMBAHAN
     private var initialCategoryId = 0
 
     val totalImagesCount: Int get() = oldImageUrls.size + newImageUris.size
@@ -63,6 +66,9 @@ class EditArticleViewModel(
                     val article = res.data!!
                     title = article.title
                     content = article.content
+                    // Load Tags (Pastikan model Article Anda sudah punya field 'tags')
+                    tags = article.tags ?: ""
+
                     selectedCategory = categories.find { it.category_id == article.category_id }
                         ?: categories.find { it.category_name == article.category_name }
 
@@ -71,8 +77,10 @@ class EditArticleViewModel(
                     deletedImageUrls.clear()
                     newImageUris.clear()
 
+                    // Simpan state awal
                     initialTitle = article.title
                     initialContent = article.content
+                    initialTags = article.tags ?: ""
                     initialCategoryId = article.category_id
                 }
             } catch (e: Exception) {
@@ -85,13 +93,21 @@ class EditArticleViewModel(
     fun deleteOldImage(url: String) { oldImageUrls.remove(url); deletedImageUrls.add(url) }
     fun updateImages(uris: List<Uri>) { newImageUris.addAll(uris) }
     fun removeNewImage(uri: Uri) { newImageUris.remove(uri) }
+
     fun updateTitle(t: String) { title = t }
     fun updateContent(c: String) { content = c }
+    fun updateTags(t: String) { tags = t } // <--- TAMBAHAN: Fungsi Update Tags
     fun updateCategory(c: Category) { selectedCategory = c }
 
     fun hasChanges(): Boolean {
         val currentCatId = selectedCategory?.category_id ?: 0
-        return title != initialTitle || content != initialContent || currentCatId != initialCategoryId || newImageUris.isNotEmpty() || deletedImageUrls.isNotEmpty()
+        // Cek perubahan termasuk Tags
+        return title != initialTitle ||
+                content != initialContent ||
+                tags != initialTags ||
+                currentCatId != initialCategoryId ||
+                newImageUris.isNotEmpty() ||
+                deletedImageUrls.isNotEmpty()
     }
 
     // --- SUBMIT UPDATE PINTAR ---
@@ -119,7 +135,7 @@ class EditArticleViewModel(
                 val gson = Gson()
                 val deletedJson = if (deletedImageUrls.isNotEmpty()) gson.toJson(deletedImageUrls) else null
 
-                // Handle Data Kosong (Kirim NULL agar aman)
+                // Handle Data Kosong
                 val catIdToSend = selectedCategory?.category_id?.toString()
                 val contentToSend = if (content.isBlank()) null else content
 
@@ -129,6 +145,7 @@ class EditArticleViewModel(
                     content = contentToSend,
                     categoryId = catIdToSend,
                     status = status,
+                    tags = tags, // <--- PERBAIKAN UTAMA: Kirim tags ke sini!
                     newImageUris = newImageUris,
                     deletedImagesJson = deletedJson,
                     context = context

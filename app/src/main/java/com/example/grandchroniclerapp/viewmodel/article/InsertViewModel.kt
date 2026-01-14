@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
-// State UI
 sealed interface UploadUiState {
     object Idle : UploadUiState
     object Loading : UploadUiState
@@ -32,18 +31,17 @@ class InsertViewModel(
     var uiState: UploadUiState by mutableStateOf(UploadUiState.Idle)
         private set
 
-    // Channel Notifikasi
     private val _snackbarEvent = Channel<String>()
     val snackbarEvent = _snackbarEvent.receiveAsFlow()
 
-    // Form Data
     var title by mutableStateOf("")
     var content by mutableStateOf("")
     var selectedCategory: Category? by mutableStateOf(null)
+    // STATE TAGS (BARU)
+    var tags by mutableStateOf("")
 
     var imageUris = mutableStateListOf<Uri>()
         private set
-
     var categories: List<Category> by mutableStateOf(emptyList())
         private set
 
@@ -55,9 +53,7 @@ class InsertViewModel(
         viewModelScope.launch {
             try {
                 val res = repository.getCategories()
-                if (res.status) {
-                    categories = res.data
-                }
+                if (res.status) categories = res.data
             } catch (e: Exception) { }
         }
     }
@@ -65,67 +61,45 @@ class InsertViewModel(
     fun updateTitle(t: String) { title = t }
     fun updateContent(c: String) { content = c }
     fun updateCategory(c: Category) { selectedCategory = c }
+    fun updateTags(t: String) { tags = t } // Setter Tags
 
-    fun addImages(uris: List<Uri>) {
-        imageUris.addAll(uris)
-    }
+    fun addImages(uris: List<Uri>) { imageUris.addAll(uris) }
+    fun removeImage(uri: Uri) { imageUris.remove(uri) }
 
-    fun removeImage(uri: Uri) {
-        imageUris.remove(uri)
-    }
+    fun hasUnsavedChanges(): Boolean = title.isNotEmpty() || content.isNotEmpty() || imageUris.isNotEmpty()
 
-    fun hasUnsavedChanges(): Boolean {
-        return title.isNotEmpty() || content.isNotEmpty() || imageUris.isNotEmpty()
-    }
-
-    // --- FUNGSI SUBMIT PINTAR ---
     fun submitArticle(context: Context, status: String) {
-        // 1. VALIDASI
+        // Validasi
         var errorMessage: String? = null
-
-        // Judul Wajib untuk semua status
-        if (title.isBlank()) {
-            errorMessage = "Judul artikel wajib diisi!"
-        }
-        // Validasi Ketat Khusus PUBLISHED
+        if (title.isBlank()) errorMessage = "Judul wajib diisi!"
         else if (status == "Published") {
-            if (selectedCategory == null) {
-                errorMessage = "Pilih kategori untuk menerbitkan!"
-            } else if (content.isBlank()) {
-                errorMessage = "Isi artikel tidak boleh kosong!"
-            }
+            if (selectedCategory == null) errorMessage = "Pilih kategori!"
+            else if (content.isBlank()) errorMessage = "Isi artikel tidak boleh kosong!"
         }
 
-        // Jika ada Error Validasi
         if (errorMessage != null) {
-            uiState = UploadUiState.Error("Validasi Gagal") // Trigger UI Merah
+            uiState = UploadUiState.Error("Validasi Gagal")
             viewModelScope.launch { _snackbarEvent.send(errorMessage!!) }
             return
         }
 
-        // 2. PROSES UPLOAD
         viewModelScope.launch {
             uiState = UploadUiState.Loading
             try {
                 val userId = userPreferences.getUserId.first()
                 if (userId == -1) {
-                    _snackbarEvent.send("Sesi berakhir. Login ulang.")
+                    _snackbarEvent.send("Login ulang.")
                     uiState = UploadUiState.Idle
                     return@launch
                 }
 
-                // Handle Data Kosong (Agar tidak error 404/Bad Request)
-                // Jika Draf dan kategori/konten kosong, kirim NULL agar Retrofit mengabaikannya
-                // Backend akan menerima undefined -> jadi NULL di database
-                val catIdToSend = selectedCategory?.category_id?.toString()
-                val contentToSend = if (content.isBlank()) null else content
-
                 val response = repository.addArticle(
                     title = title,
-                    content = contentToSend,
-                    categoryId = catIdToSend,
+                    content = if (content.isBlank()) null else content,
+                    categoryId = selectedCategory?.category_id?.toString(),
                     userId = userId.toString(),
                     status = status,
+                    tags = tags, // KIRIM TAGS KE SERVER
                     imageUris = imageUris,
                     context = context
                 )
@@ -135,23 +109,20 @@ class InsertViewModel(
                     _snackbarEvent.send(if (status == "Draft") "Draf Disimpan" else "Artikel Terbit")
                 } else {
                     uiState = UploadUiState.Error(response.message ?: "Gagal")
-                    _snackbarEvent.send(response.message ?: "Gagal upload")
+                    _snackbarEvent.send(response.message ?: "Gagal")
                 }
             } catch (e: Exception) {
                 uiState = UploadUiState.Error("Error")
-                _snackbarEvent.send("Terjadi kesalahan: ${e.message}")
+                _snackbarEvent.send("Error: ${e.message}")
             }
         }
-    }
-
-    private fun sendEvent(msg: String) {
-        viewModelScope.launch { _snackbarEvent.send(msg) }
     }
 
     fun resetState() {
         uiState = UploadUiState.Idle
         title = ""
         content = ""
+        tags = ""
         selectedCategory = null
         imageUris.clear()
     }

@@ -67,7 +67,6 @@ fun InsertArticleScreen(
     }
     BackHandler { onBackAttempt() }
 
-    // Listener Notifikasi ViewModel
     LaunchedEffect(Unit) {
         viewModel.snackbarEvent.collectLatest { message -> snackbarHostState.showSnackbar(message) }
     }
@@ -118,7 +117,6 @@ fun InsertArticleScreen(
         )
     }
 
-    // MAIN UI
     Box(modifier = Modifier.fillMaxSize().background(PastelBluePrimary)) {
         Column(modifier = Modifier.fillMaxSize()) {
             Spacer(modifier = Modifier.height(80.dp))
@@ -177,6 +175,19 @@ fun InsertArticleScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // --- INPUT TAGS (SOLUSI CARA MUDAH) ---
+                    // Ini memenuhi REQ-409 tanpa perlu codingan rumit
+                    OutlinedTextField(
+                        value = viewModel.tags,
+                        onValueChange = { viewModel.updateTags(it) },
+                        label = { Text("Tags / Hashtag (Opsional)") },
+                        placeholder = { Text("Contoh: #Sejarah #Budaya") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
                     // ISI ARTIKEL
                     OutlinedTextField(
                         value = viewModel.content,
@@ -190,22 +201,20 @@ fun InsertArticleScreen(
 
                     // TOMBOL
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        // Tombol Draft
                         OutlinedButton(
                             onClick = {
                                 if (viewModel.title.isNotBlank()) showDraftConfirmDialog = true
-                                else viewModel.submitArticle(context, "Draft") // Trigger Error Judul
+                                else viewModel.submitArticle(context, "Draft")
                             },
                             modifier = Modifier.weight(1f).height(50.dp),
                             shape = RoundedCornerShape(12.dp),
                             enabled = uiState !is UploadUiState.Loading
                         ) { Text("Draf") }
 
-                        // Tombol Terbit
                         Button(
                             onClick = {
                                 if (viewModel.title.isNotBlank() && viewModel.selectedCategory != null && viewModel.content.isNotBlank()) showPublishConfirmDialog = true
-                                else viewModel.submitArticle(context, "Published") // Trigger Error
+                                else viewModel.submitArticle(context, "Published")
                             },
                             modifier = Modifier.weight(1f).height(50.dp),
                             shape = RoundedCornerShape(12.dp),
@@ -231,7 +240,7 @@ fun InsertArticleScreen(
             SnackbarHost(hostState = snackbarHostState) { data ->
                 val isSuccess = data.visuals.message.contains("Berhasil", true) ||
                         data.visuals.message.contains("Disimpan", true) ||
-                        data.visuals.message.contains("Terbit", true) // Tambahkan keyword "Terbit"
+                        data.visuals.message.contains("Terbit", true)
 
                 val bgColor = if (isSuccess) Brush.horizontalGradient(listOf(PastelBluePrimary, PastelPinkSecondary)) else Brush.linearGradient(listOf(SoftError, SoftError))
                 val icon = if (isSuccess) Icons.Default.CheckCircle else Icons.Default.Close

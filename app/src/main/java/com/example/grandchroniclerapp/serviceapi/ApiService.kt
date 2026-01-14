@@ -15,7 +15,11 @@ interface ApiService {
 
     // --- ARTIKEL (READ & DELETE) ---
     @GET("articles")
-    suspend fun getArticles(@Query("q") query: String? = null): ArticleResponse
+    suspend fun getArticles(
+        @Query("q") query: String? = null,
+        @Query("category_id") categoryId: Int? = null,
+        @Query("page") page: Int = 1
+    ): ArticleResponse
 
     @GET("categories")
     suspend fun getCategories(): CategoryResponse
@@ -34,10 +38,11 @@ interface ApiService {
     @POST("articles")
     suspend fun addArticle(
         @Part("title") title: RequestBody,
-        @Part("content") content: RequestBody?,      // Boleh null (Draft)
-        @Part("category_id") categoryId: RequestBody?, // Boleh null (Draft)
+        @Part("content") content: RequestBody?,
+        @Part("category_id") categoryId: RequestBody?,
         @Part("user_id") userId: RequestBody,
         @Part("status") status: RequestBody,
+        @Part("tags") tags: RequestBody?, // <--- TAMBAHAN TAGS
         @Part images: List<MultipartBody.Part>
     ): AddArticleResponse
 
@@ -46,9 +51,10 @@ interface ApiService {
     suspend fun updateArticle(
         @Path("id") articleId: Int,
         @Part("title") title: RequestBody,
-        @Part("content") content: RequestBody?,      // Boleh null
-        @Part("category_id") categoryId: RequestBody?, // Boleh null
+        @Part("content") content: RequestBody?,
+        @Part("category_id") categoryId: RequestBody?,
         @Part("status") status: RequestBody,
+        @Part("tags") tags: RequestBody?, // <--- TAMBAHAN TAGS
         @Part images: List<MultipartBody.Part>,
         @Part("deleted_images") deletedImages: RequestBody? = null
     ): AddArticleResponse

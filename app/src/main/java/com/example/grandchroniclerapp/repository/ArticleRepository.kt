@@ -19,27 +19,30 @@ import java.io.FileOutputStream
 
 class ArticleRepository(private val apiService: ApiService) {
 
-    // Helper: String? -> RequestBody?
     private fun createPartFromString(value: String?): RequestBody? {
-        // Jika string kosong (""), anggap null agar tidak dikirim ke server/dibatalkan server
         if (value.isNullOrBlank()) return null
         return value.toRequestBody("text/plain".toMediaTypeOrNull())
     }
 
     // --- ARTIKEL ---
-    suspend fun getArticles(query: String? = null): ArticleResponse = apiService.getArticles(query)
+    // Update: Tambah parameter page
+    suspend fun getArticles(query: String? = null, categoryId: Int? = null, page: Int = 1): ArticleResponse {
+        return apiService.getArticles(query, categoryId, page)
+    }
+
     suspend fun getCategories(): CategoryResponse = apiService.getCategories()
     suspend fun getArticleDetail(id: Int): DetailArticleResponse = apiService.getArticleDetail(id)
     suspend fun getMyArticles(userId: Int): ArticleResponse = apiService.getMyArticles(userId)
     suspend fun deleteArticle(articleId: Int): UserDetailResponse = apiService.deleteArticle(articleId)
 
-    // Add Article (Draft/Published)
+    // Add Article (Update Tags)
     suspend fun addArticle(
         title: String,
         content: String?,
         categoryId: String?,
         userId: String,
         status: String,
+        tags: String?, // <--- TAGS
         imageUris: List<Uri>,
         context: Context
     ): AddArticleResponse {
@@ -48,18 +51,20 @@ class ArticleRepository(private val apiService: ApiService) {
         val categoryPart = createPartFromString(categoryId)
         val userPart = createPartFromString(userId)!!
         val statusPart = createPartFromString(status)!!
+        val tagsPart = createPartFromString(tags) // <--- Convert Tags
         val imageParts = prepareImageParts(imageUris, context)
 
-        return apiService.addArticle(titlePart, contentPart, categoryPart, userPart, statusPart, imageParts)
+        return apiService.addArticle(titlePart, contentPart, categoryPart, userPart, statusPart, tagsPart, imageParts)
     }
 
-    // Update Article
+    // Update Article (Update Tags)
     suspend fun updateArticle(
         articleId: Int,
         title: String,
         content: String?,
         categoryId: String?,
         status: String,
+        tags: String?, // <--- TAGS
         newImageUris: List<Uri>,
         deletedImagesJson: String?,
         context: Context
@@ -68,21 +73,16 @@ class ArticleRepository(private val apiService: ApiService) {
         val contentPart = createPartFromString(content)
         val categoryPart = createPartFromString(categoryId)
         val statusPart = createPartFromString(status)!!
+        val tagsPart = createPartFromString(tags) // <--- Convert Tags
         val deletedPart = createPartFromString(deletedImagesJson)
         val imageParts = prepareImageParts(newImageUris, context)
 
-        return apiService.updateArticle(articleId, titlePart, contentPart, categoryPart, statusPart, imageParts, deletedPart)
+        return apiService.updateArticle(articleId, titlePart, contentPart, categoryPart, statusPart, tagsPart, imageParts, deletedPart)
     }
 
     // --- USER (PROFIL) ---
-
-    // 1. Get User
     suspend fun getUserDetail(userId: Int): UserDetailResponse = apiService.getUserDetail(userId)
-
-    // 2. Delete User
     suspend fun deleteUser(userId: Int): AuthResponse = apiService.deleteUser(userId)
-
-    // 3. Update User
     suspend fun updateUser(
         userId: Int,
         fullName: String,
@@ -96,7 +96,6 @@ class ArticleRepository(private val apiService: ApiService) {
         val emailPart = createPartFromString(email)!!
         val bioPart = createPartFromString(bio)
         val passPart = if (password.isNullOrBlank()) null else createPartFromString(password)
-
         var photoPart: MultipartBody.Part? = null
         if (photoUri != null) {
             val file = getFileFromUri(context, photoUri)

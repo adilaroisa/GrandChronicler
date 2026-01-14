@@ -16,6 +16,7 @@ data class Article(
     val views_count: Int = 0,
     val category_name: String,
     val author_name: String? = null,
+    val tags: String? = null,
     val status: String
 ) {
     // --- HELPER PROPERTY

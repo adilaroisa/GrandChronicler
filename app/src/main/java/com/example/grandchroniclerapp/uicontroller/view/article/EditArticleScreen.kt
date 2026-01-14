@@ -51,7 +51,9 @@ fun EditArticleScreen(
     navigateBack: () -> Unit,
     viewModel: EditArticleViewModel = viewModel(factory = PenyediaViewModel.Factory)
 ) {
+    // Load Data saat pertama kali dibuka
     LaunchedEffect(articleId) { viewModel.loadArticleData(articleId) }
+
     val uiState = viewModel.uiState
     val context = LocalContext.current
     val scrollState = rememberScrollState()
@@ -80,7 +82,7 @@ fun EditArticleScreen(
         }
     }
 
-    // DIALOGS
+    // --- DIALOGS ---
     if (imageToDeleteUrl != null) {
         AlertDialog(onDismissRequest = { imageToDeleteUrl = null },
             title = { Text("Hapus Gambar?", color = SoftError) },
@@ -122,7 +124,7 @@ fun EditArticleScreen(
             Surface(modifier = Modifier.fillMaxSize(), shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp), color = Color.White) {
                 Column(modifier = Modifier.fillMaxSize().padding(20.dp).verticalScroll(scrollState)) {
 
-                    // GAMBAR
+                    // 1. GAMBAR (LAMA & BARU)
                     if (viewModel.oldImageUrls.isNotEmpty()) {
                         Text("Gambar Lama:", fontSize = 12.sp, color = Color.Gray)
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.height(100.dp)) {
@@ -158,7 +160,7 @@ fun EditArticleScreen(
 
                     Spacer(Modifier.height(20.dp))
 
-                    // FORM DENGAN ERROR
+                    // 2. FORM JUDUL
                     OutlinedTextField(
                         value = viewModel.title, onValueChange = { viewModel.updateTitle(it) },
                         label = { Text("Judul") }, modifier = Modifier.fillMaxWidth(),
@@ -166,6 +168,7 @@ fun EditArticleScreen(
                     )
                     Spacer(Modifier.height(16.dp))
 
+                    // 3. FORM KATEGORI
                     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
                         OutlinedTextField(
                             value = viewModel.selectedCategory?.category_name ?: "Pilih Kategori",
@@ -179,6 +182,18 @@ fun EditArticleScreen(
                     }
                     Spacer(Modifier.height(16.dp))
 
+                    // 4. FORM TAGS (DITAMBAHKAN DI SINI)
+                    OutlinedTextField(
+                        value = viewModel.tags, // Bind ke ViewModel
+                        onValueChange = { viewModel.updateTags(it) }, // Update ViewModel
+                        label = { Text("Tags / Hashtag (Opsional)") },
+                        placeholder = { Text("Contoh: #Sejarah #Budaya") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    Spacer(Modifier.height(16.dp))
+
+                    // 5. FORM KONTEN
                     OutlinedTextField(
                         value = viewModel.content, onValueChange = { viewModel.updateContent(it) },
                         label = { Text("Isi Artikel") }, modifier = Modifier.fillMaxWidth().height(300.dp),
@@ -186,7 +201,7 @@ fun EditArticleScreen(
                     )
                     Spacer(Modifier.height(24.dp))
 
-                    // TOMBOL
+                    // 6. TOMBOL AKSI
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(
                             onClick = { if (viewModel.title.isNotBlank()) showDraftConfirmDialog = true else viewModel.submitUpdate(context, articleId, "Draft") },
@@ -203,14 +218,16 @@ fun EditArticleScreen(
             }
         }
 
+        // HEADER
         Row(Modifier.fillMaxWidth().height(80.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { onBackAttempt() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White) }
             Text("Edit Artikel", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
 
+        // SNACKBAR
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
             SnackbarHost(hostState = snackbarHostState) { data ->
-                val isSuccess = data.visuals.message.contains("Berhasil", true)
+                val isSuccess = data.visuals.message.contains("Berhasil", true) || data.visuals.message.contains("Update", true)
                 val bgColor = if (isSuccess) Brush.horizontalGradient(listOf(PastelBluePrimary, PastelPinkSecondary)) else Brush.linearGradient(listOf(SoftError, SoftError))
 
                 Box(modifier = Modifier.padding(16.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(bgColor).padding(16.dp)) {
