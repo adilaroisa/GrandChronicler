@@ -1,9 +1,12 @@
-package com.example.grandchroniclerapp.uicontroller.view.search // Sesuaikan package jika perlu
+package com.example.grandchroniclerapp.uicontroller.view.search
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -11,14 +14,26 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.grandchroniclerapp.uicontroller.view.home.ArticleCard // Import ArticleCard dari Home
+import coil.compose.AsyncImage
+import com.example.grandchroniclerapp.model.Article
+import com.example.grandchroniclerapp.ui.theme.PastelBluePrimary
 import com.example.grandchroniclerapp.viewmodel.provider.PenyediaViewModel
 import com.example.grandchroniclerapp.viewmodel.search.SearchUiState
 import com.example.grandchroniclerapp.viewmodel.search.SearchViewModel
@@ -51,6 +66,7 @@ fun SearchScreen(
             },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            shape = RoundedCornerShape(12.dp),
             keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
         )
@@ -61,7 +77,7 @@ fun SearchScreen(
         when (uiState) {
             is SearchUiState.Loading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(color = PastelBluePrimary)
                 }
             }
             is SearchUiState.Error -> {
@@ -70,30 +86,38 @@ fun SearchScreen(
                 }
             }
             is SearchUiState.Success -> {
-                // HASIL PENCARIAN
+                // HEADER HASIL PENCARIAN
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(bottom = 8.dp)
                 ) {
-                    IconButton(onClick = { viewModel.updateQuery("") }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+                    if (viewModel.searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.updateQuery("") }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+                        }
                     }
-                    Text(text = "Hasil Pencarian:", style = MaterialTheme.typography.titleMedium)
+                    Text(text = "Hasil Pencarian:", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
 
                 if (uiState.articles.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Tidak ada artikel ditemukan.")
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Search, null, tint = Color.Gray, modifier = Modifier.size(50.dp))
+                            Spacer(Modifier.height(8.dp))
+                            Text("Tidak ada artikel ditemukan.", color = Color.Gray)
+                        }
                     }
                 } else {
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
+                        columns = GridCells.Fixed(2), // Tetap 2 kolom
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(uiState.articles) { article ->
-                            ArticleCard(
+                            // PANGGIL KARTU KHUSUS SEARCH DI SINI
+                            SearchArticleCard(
                                 article = article,
+                                searchQuery = viewModel.searchQuery, // Kirim query user
                                 onClick = { onDetailClick(article.article_id) }
                             )
                         }
@@ -101,21 +125,20 @@ fun SearchScreen(
                 }
             }
             is SearchUiState.Idle -> {
-                // --- TAMPILAN AWAL: KATEGORI (DIKEMBALIKAN) ---
-                Text(text = "Jelajahi Kategori", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(8.dp))
+                // --- TAMPILAN AWAL: KATEGORI ---
+                Text(text = "Jelajahi Kategori", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(12.dp))
 
                 if (viewModel.categories.isEmpty()) {
-                    Text("Memuat kategori...", style = MaterialTheme.typography.bodySmall)
+                    Text("Memuat kategori...", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 } else {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(viewModel.categories) { category ->
                             CategoryCard(categoryName = category.category_name) {
-                                // Saat kategori diklik, otomatis cari berdasarkan nama kategori
                                 viewModel.updateQuery(category.category_name)
                             }
                         }
@@ -126,23 +149,126 @@ fun SearchScreen(
     }
 }
 
-// Komponen Kartu Kategori
-@OptIn(ExperimentalMaterial3Api::class)
+// --- KOMPONEN LOKAL DI DALAM FILE INI (SUPAYA MENYATU) ---
+
 @Composable
 fun CategoryCard(categoryName: String, onClick: () -> Unit) {
     Card(
         onClick = onClick,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        ),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFE0E0)), // Warna Peach/Pink lembut
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier.height(60.dp).fillMaxWidth()
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
                 text = categoryName,
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF4A4A4A)
             )
         }
+    }
+}
+
+// --- KARTU KHUSUS SEARCH DENGAN HIGHLIGHT SNIPPET ---
+@Composable
+fun SearchArticleCard(
+    article: Article,
+    searchQuery: String,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column {
+            // Gambar Thumbnail
+            if (article.images.isNotEmpty()) {
+                val imgUrl = if (article.images[0].startsWith("http")) article.images[0] else "http://10.0.2.2:3000/uploads/${article.images[0]}"
+                AsyncImage(
+                    model = imgUrl,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(modifier = Modifier.fillMaxWidth().height(100.dp).background(Color.LightGray))
+            }
+
+            Column(modifier = Modifier.padding(12.dp)) {
+                // Judul
+                Text(
+                    text = article.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // --- BAGIAN AJAIB: SNIPPET ---
+                // Kita panggil fungsi helper di bawah untuk bikin snippet
+                val snippet = remember(article.content, searchQuery) {
+                    generateSearchSnippet(article.content, searchQuery)
+                }
+
+                Text(
+                    text = snippet, // Ini teks yang sudah di-highlight
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.sp,
+                    color = Color.Gray,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 14.sp
+                )
+            }
+        }
+    }
+}
+
+// --- FUNGSI HELPER (LOGIC HIGHLIGHT) ---
+// Disatukan di file ini sesuai permintaan
+fun generateSearchSnippet(content: String, query: String): AnnotatedString {
+    // 1. Jika query kosong, ambil 100 huruf pertama saja
+    if (query.isBlank()) {
+        return buildAnnotatedString { append(content.take(80) + "...") }
+    }
+
+    // 2. Cari posisi kata kunci
+    val index = content.indexOf(query, ignoreCase = true)
+
+    // 3. Jika tidak ketemu
+    if (index == -1) return buildAnnotatedString { append(content.take(80) + "...") }
+
+    // 4. Tentukan batas potong (30 huruf sebelum & sesudah agar muat di card)
+    val start = maxOf(0, index - 30)
+    val end = minOf(content.length, index + query.length + 50)
+
+    val snippetRaw = content.substring(start, end)
+
+    // 5. Bikin Text Cantik (Highlight)
+    return buildAnnotatedString {
+        if (start > 0) append("... ")
+
+        val relativeIndex = snippetRaw.indexOf(query, ignoreCase = true)
+        if (relativeIndex != -1) {
+            append(snippetRaw.substring(0, relativeIndex)) // Sebelum
+
+            // HIGHLIGHT KATA KUNCI (Bold + Biru)
+            withStyle(style = SpanStyle(fontWeight = FontWeight.ExtraBold, color = PastelBluePrimary, background = Color(0xFFE3F2FD))) {
+                append(snippetRaw.substring(relativeIndex, relativeIndex + query.length))
+            }
+
+            append(snippetRaw.substring(relativeIndex + query.length)) // Sesudah
+        } else {
+            append(snippetRaw)
+        }
+
+        if (end < content.length) append("...")
     }
 }
