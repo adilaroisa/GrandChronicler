@@ -72,7 +72,7 @@ fun DetailArticleScreen(
                         .padding(innerPadding)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    // --- 1. HEADER GAMBAR ---
+                    // --- 1. HEADER GAMBAR SLIDER ---
                     if (article.images.isNotEmpty()) {
                         val pagerState = rememberPagerState(pageCount = { article.images.size })
 
@@ -83,9 +83,8 @@ fun DetailArticleScreen(
                                 .background(Color.LightGray)
                         ) {
                             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                                // Cek URL
+                                // Cek URL, tambahkan base url jika perlu
                                 val rawUrl = article.images[page]
-                                // Jika URL belum ada http, tambahkan manual
                                 val fullUrl = if (rawUrl.startsWith("http")) rawUrl else "http://10.0.2.2:3000/uploads/$rawUrl"
 
                                 AsyncImage(
@@ -96,7 +95,7 @@ fun DetailArticleScreen(
                                 )
                             }
 
-                            // Navigasi Slider
+                            // Tombol Navigasi Slider (Kiri/Kanan)
                             if (article.images.size > 1) {
                                 if (pagerState.currentPage > 0) {
                                     IconButton(
@@ -110,6 +109,7 @@ fun DetailArticleScreen(
                                         modifier = Modifier.align(Alignment.CenterEnd).padding(8.dp).background(Color.Black.copy(0.3f), CircleShape)
                                     ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.White) }
                                 }
+                                // Indikator Halaman (1/3)
                                 Box(
                                     modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).background(Color.Black.copy(0.6f), RoundedCornerShape(16.dp)).padding(horizontal = 10.dp, vertical = 4.dp)
                                 ) {
@@ -123,25 +123,43 @@ fun DetailArticleScreen(
                         }
                     }
 
-                    // --- 2. KONTEN ---
+                    // --- 2. KONTEN ARTIKEL ---
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(article.category_name, color = PastelBluePrimary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                        // Kategori
+                        Text(article.category_name ?: "Tanpa Kategori", color = PastelBluePrimary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+
                         Spacer(Modifier.height(8.dp))
+
+                        // Judul
                         Text(article.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+
                         Spacer(Modifier.height(16.dp))
 
+                        // Metadata Row (Penulis | Tanggal | Views)
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Penulis
                             Icon(Icons.Default.Person, null, Modifier.size(16.dp), tint = Color.Gray)
                             Spacer(Modifier.width(4.dp))
                             Text(article.author_name ?: "Unknown", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+
                             Spacer(Modifier.width(16.dp))
+
+                            // Tanggal
                             Icon(Icons.Default.CalendarToday, null, Modifier.size(16.dp), tint = Color.Gray)
                             Spacer(Modifier.width(4.dp))
                             Text(article.published_at?.take(10) ?: "Draft", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+
+                            // --- VIEW COUNT (DITAMBAHKAN DI SINI) ---
+                            Spacer(Modifier.width(16.dp))
+                            Icon(Icons.Default.Visibility, null, Modifier.size(16.dp), tint = Color.Gray)
+                            Spacer(Modifier.width(4.dp))
+                            // Mengambil views_count dari objek article
+                            Text("${article.views_count} x Dilihat", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                         }
 
                         Divider(Modifier.padding(vertical = 20.dp))
 
+                        // Isi Artikel
                         Text(article.content, style = MaterialTheme.typography.bodyLarge, lineHeight = 28.sp)
                     }
                 }
