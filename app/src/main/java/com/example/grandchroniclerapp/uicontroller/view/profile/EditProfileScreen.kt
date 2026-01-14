@@ -65,14 +65,15 @@ fun EditProfileScreen(
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    // State untuk memicu validasi visual
     var showErrors by remember { mutableStateOf(false) }
 
-    // Validasi Password (Jika diisi)
+    // VALIDASI NAMA: HANYA HURUF, SPASI, TITIK
+    val isNameValid = viewModel.fullName.isNotBlank() && viewModel.fullName.matches(Regex("^[a-zA-Z .]*$"))
+
+    // VALIDASI PASSWORD (JIKA DIISI)
     val pass = viewModel.password
     val hasLetter = pass.any { it.isLetter() }
     val hasDigit = pass.any { it.isDigit() }
-    // Valid jika KOSONG (tidak mau ubah) ATAU (8 char + huruf + angka)
     val isPasswordValid = pass.isEmpty() || (pass.length >= 8 && hasLetter && hasDigit)
 
     fun onBackAttempt() {
@@ -153,9 +154,22 @@ fun EditProfileScreen(
 
                     // Fields
                     OutlinedTextField(value = viewModel.role, onValueChange = {}, label = { Text("Status Akun") }, leadingIcon = { Icon(Icons.Default.Badge, null) }, modifier = Modifier.fillMaxWidth(), readOnly = true, enabled = false, shape = RoundedCornerShape(12.dp))
+
                     Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(value = viewModel.fullName, onValueChange = { viewModel.fullName = it }, label = { Text("Nama Lengkap") }, leadingIcon = { Icon(Icons.Default.Person, null) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+
+                    // NAMA
+                    OutlinedTextField(
+                        value = viewModel.fullName,
+                        onValueChange = { viewModel.fullName = it },
+                        label = { Text("Nama Lengkap") },
+                        leadingIcon = { Icon(Icons.Default.Person, null) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        isError = showErrors && !isNameValid
+                    )
+
                     Spacer(modifier = Modifier.height(16.dp))
+
                     OutlinedTextField(value = viewModel.email, onValueChange = { viewModel.email = it }, label = { Text("Email") }, leadingIcon = { Icon(Icons.Default.Email, null) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -170,7 +184,7 @@ fun EditProfileScreen(
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         shape = RoundedCornerShape(12.dp),
-                        isError = showErrors && !isPasswordValid, // Merah jika tombol ditekan & salah
+                        isError = showErrors && !isPasswordValid,
                         trailingIcon = { IconButton(onClick = { passwordVisible = !passwordVisible }) { Icon(if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff, null) } }
                     )
 
@@ -207,10 +221,13 @@ fun EditProfileScreen(
         Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.BottomEnd) {
             FloatingActionButton(
                 onClick = {
-                    showErrors = true // Trigger validasi visual
+                    showErrors = true
 
                     if (viewModel.fullName.isBlank() || viewModel.email.isBlank()) {
                         scope.launch { snackbarHostState.showSnackbar("Nama dan Email wajib diisi") }
+                    } else if (!isNameValid) {
+                        // ERROR JIKA ADA ANGKA
+                        scope.launch { snackbarHostState.showSnackbar("Nama hanya boleh huruf dan titik (.)") }
                     } else if (!isPasswordValid) {
                         scope.launch { snackbarHostState.showSnackbar("Password tidak memenuhi syarat keamanan") }
                     } else {

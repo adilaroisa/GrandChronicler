@@ -52,20 +52,19 @@ fun RegisterScreen(
     val scope = rememberCoroutineScope()
     var passwordVisible by remember { mutableStateOf(false) }
 
-    // State Checkbox Syarat & Ketentuan
     var isTermsAccepted by remember { mutableStateOf(false) }
-
-    // State untuk memicu tampilan error HANYA setelah tombol ditekan
     var showErrors by remember { mutableStateOf(false) }
 
     // --- LOGIKA VALIDASI ---
-    // 1. Nama: Tidak kosong & Alphanumeric spasi
-    val isNameValid = viewModel.fullName.isNotBlank() && viewModel.fullName.matches(Regex("^[a-zA-Z0-9 ]*$"))
 
-    // 2. Email: Ada @ dan .
+    // 1. Nama: HANYA Huruf, Spasi, dan Titik
+    // Regex: ^[a-zA-Z .]*$
+    val isNameValid = viewModel.fullName.isNotBlank() && viewModel.fullName.matches(Regex("^[a-zA-Z .]*$"))
+
+    // 2. Email
     val isEmailValid = viewModel.email.contains("@") && viewModel.email.contains(".")
 
-    // 3. Password: Min 8, Huruf + Angka
+    // 3. Password
     val hasLetter = viewModel.password.any { it.isLetter() }
     val hasDigit = viewModel.password.any { it.isDigit() }
     val isPasswordValid = viewModel.password.length >= 8 && hasLetter && hasDigit
@@ -149,7 +148,6 @@ fun RegisterScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
-                        // Error Merah HANYA jika tombol sudah ditekan DAN nama salah
                         isError = showErrors && !isNameValid,
                         trailingIcon = {
                             if (showErrors && !isNameValid) Icon(Icons.Default.Warning, null, tint = SoftError)
@@ -184,7 +182,6 @@ fun RegisterScreen(
                         shape = RoundedCornerShape(12.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        // Error Merah jika tombol ditekan DAN password salah
                         isError = showErrors && !isPasswordValid,
                         trailingIcon = {
                             val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
@@ -193,8 +190,6 @@ fun RegisterScreen(
                             }
                         }
                     )
-
-                    // (REMOVED: Helper Text di bawah password dihapus agar konsisten dengan field lain)
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -208,7 +203,6 @@ fun RegisterScreen(
                             onCheckedChange = { isTermsAccepted = it },
                             colors = CheckboxDefaults.colors(
                                 checkedColor = PastelBluePrimary,
-                                // Checkbox jadi merah jika lupa dicentang saat klik daftar
                                 uncheckedColor = if (showErrors && !isTermsAccepted) SoftError else Color.Gray
                             )
                         )
@@ -234,23 +228,19 @@ fun RegisterScreen(
                     // --- BUTTON DAFTAR ---
                     Button(
                         onClick = {
-                            // 1. Saat diklik, aktifkan mode "Show Errors" (Border jadi merah jika salah)
                             showErrors = true
 
-                            // 2. Cek Validasi Satu per Satu untuk Snackbar
                             if (viewModel.fullName.isBlank() || viewModel.email.isBlank() || viewModel.password.isBlank()) {
                                 scope.launch { snackbarHostState.showSnackbar("Semua kolom wajib diisi!") }
                             } else if (!isNameValid) {
-                                scope.launch { snackbarHostState.showSnackbar("Nama hanya boleh huruf dan angka") }
+                                scope.launch { snackbarHostState.showSnackbar("Nama hanya boleh huruf dan titik (.)") }
                             } else if (!isEmailValid) {
                                 scope.launch { snackbarHostState.showSnackbar("Format email salah") }
                             } else if (!isPasswordValid) {
-                                // Pesan error password muncul di sini saja (Snackbar)
                                 scope.launch { snackbarHostState.showSnackbar("Password min. 8 karakter, kombinasi huruf & angka") }
                             } else if (!isTermsAccepted) {
                                 scope.launch { snackbarHostState.showSnackbar("Anda wajib menyetujui Syarat & Ketentuan") }
                             } else {
-                                // 3. Jika Semua Lolos -> Register
                                 viewModel.register()
                             }
                         },
