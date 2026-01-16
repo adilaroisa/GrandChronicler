@@ -14,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -24,8 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
 import coil.request.ImageRequest
-import coil.size.Size
 import com.example.grandchroniclerapp.R
 import com.example.grandchroniclerapp.model.Article
 import com.example.grandchroniclerapp.ui.theme.PastelBluePrimary
@@ -42,8 +43,11 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel(factory = PenyediaViewModel.Factory)
 ) {
     val uiState = viewModel.homeUiState
+
+    // State Grid i
     val gridState = rememberLazyStaggeredGridState()
 
+    // Infinite Scroll
     val isAtBottom by remember {
         derivedStateOf {
             val layoutInfo = gridState.layoutInfo
@@ -61,8 +65,7 @@ fun HomeScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(PastelBluePrimary)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Spacer(modifier = Modifier.height(130.dp))
-
+            Spacer(modifier = Modifier.height(80.dp))
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
@@ -96,8 +99,11 @@ fun HomeScreen(
                                 verticalItemSpacing = 16.dp,
                                 modifier = Modifier.fillMaxSize()
                             ) {
+                                // Menjaga kestabilan item saat scroll/update
                                 items(viewModel.articles, key = { it.article_id }) { article ->
+
                                     val isTokohDunia = article.category_id == 2
+
                                     HybridArticleCard(
                                         article = article,
                                         isPinterestStyle = isTokohDunia,
@@ -119,36 +125,12 @@ fun HomeScreen(
             }
         }
 
-        // --- HEADER JUDUL ---
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(130.dp)
-                .padding(horizontal = 16.dp)
-                .padding(top = 20.dp),
+            modifier = Modifier.fillMaxWidth().height(80.dp).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                // Baris 1: The Grand
-                Text(
-                    text = "The Grand",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-
-                // Baris 2: Chronicler
-                Text(
-                    text = "Chronicler",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
+            Text(text = stringResource(R.string.home_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
         }
     }
 }
@@ -161,7 +143,7 @@ fun HybridArticleCard(
 ) {
     val thumbnailImage = article.images.firstOrNull() ?: article.image
 
-    // 1. Modifier Kartu
+    // 1. Modifier Kartu Utama
     val sizeModifier = if (isPinterestStyle) {
         Modifier.fillMaxWidth().wrapContentHeight()
     } else {
@@ -183,33 +165,39 @@ fun HybridArticleCard(
 
                 // 2. Modifier Gambar
                 val imageModifier = if (isPinterestStyle) {
+
                     Modifier
                         .fillMaxWidth()
                         .wrapContentHeight()
-                        .heightIn(min = 100.dp)
+                        .heightIn(min = 120.dp)
                 } else {
-                    Modifier
-                        .fillMaxWidth()
-                        .height(140.dp)
+                    Modifier.fillMaxWidth().height(140.dp)
                 }
+
 
                 val contentScale = if (isPinterestStyle) ContentScale.FillWidth else ContentScale.Crop
 
+                val request = ImageRequest.Builder(LocalContext.current)
+                    .data(imgUrl)
+                    .crossfade(true)
+                    .diskCachePolicy(CachePolicy.ENABLED)
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .build()
+
                 AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(imgUrl)
-                        .crossfade(true)
-                        .build(),
+                    model = request,
                     contentDescription = null,
                     contentScale = contentScale,
-                    modifier = imageModifier
+                    modifier = imageModifier.background(Color(0xFFF5F5F5)) // Background abu tipis saat loading
                 )
             } else {
+                // Placeholder Teks jika tidak ada gambar
                 Box(modifier = Modifier.fillMaxWidth().height(140.dp).background(Color(0xFFEEEEEE)), contentAlignment = Alignment.Center) {
                     Text("No Image", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                 }
             }
 
+            // Konten Teks
             Column(modifier = Modifier.padding(12.dp)) {
                 Surface(
                     color = badgeColor,
@@ -230,6 +218,7 @@ fun HybridArticleCard(
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(text = "Oleh: ${article.author_name ?: "Sejarawan"}", style = MaterialTheme.typography.bodySmall, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
 
+                // menampilkan cuplikan teks hanya untuk Pinterest Style
                 if (isPinterestStyle && article.content.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(text = article.content.take(60) + "...", style = MaterialTheme.typography.bodySmall, color = Color.Gray, lineHeight = 14.sp)

@@ -1,20 +1,27 @@
 package com.example.grandchroniclerapp.uicontroller.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -25,6 +32,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.grandchroniclerapp.R
+import com.example.grandchroniclerapp.data.UserPreferences
+import com.example.grandchroniclerapp.ui.theme.PastelBluePrimary
 import com.example.grandchroniclerapp.uicontroller.view.profile.ProfileScreen
 import com.example.grandchroniclerapp.uicontroller.view.profile.EditProfileScreen
 import com.example.grandchroniclerapp.uicontroller.view.profile.AboutScreen
@@ -34,7 +43,7 @@ import com.example.grandchroniclerapp.uicontroller.view.article.EditArticleScree
 import com.example.grandchroniclerapp.uicontroller.view.article.InsertArticleScreen
 import com.example.grandchroniclerapp.uicontroller.view.auth.LoginScreen
 import com.example.grandchroniclerapp.uicontroller.view.auth.RegisterScreen
-import com.example.grandchroniclerapp.uicontroller.view.auth.TermsOfServiceScreen // Pastikan sudah di-import
+import com.example.grandchroniclerapp.uicontroller.view.auth.TermsOfServiceScreen
 import com.example.grandchroniclerapp.uicontroller.view.home.HomeScreen
 
 @Composable
@@ -42,6 +51,22 @@ fun PengelolaHalaman(
     navController: NavHostController = rememberNavController(),
     modifier: Modifier = Modifier
 ) {
+    // --- [LOGIKA CEK SESI USER] ---
+    val context = LocalContext.current
+    val userPreferences = remember { UserPreferences(context) }
+    val userIdState by userPreferences.getUserId.collectAsState(initial = null)
+
+    if (userIdState == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = PastelBluePrimary)
+        }
+        return
+    }
+
+    // Start Destination
+    val startDestination = if (userIdState != -1) DestinasiHome.route else DestinasiLogin.route
+
+    // --- [NAVIGASI UTAMA] ---
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
@@ -49,7 +74,7 @@ fun PengelolaHalaman(
     val excludedRoutes = listOf(
         DestinasiLogin.route,
         DestinasiRegister.route,
-        DestinasiTerms.route, // Sembunyikan bottom bar di Terms
+        DestinasiTerms.route,
         DestinasiDetail.routeWithArg,
         DestinasiEditArticle.routeWithArgs,
         "edit_profile",
@@ -72,13 +97,14 @@ fun PengelolaHalaman(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = DestinasiLogin.route,
+            startDestination = startDestination,
             modifier = Modifier.padding(innerPadding)
         ) {
             // --- AUTHENTICATION ---
             composable(DestinasiLogin.route) {
                 LoginScreen(
                     onLoginSuccess = {
+                        // Navigasi ke Home dan hapus Login dari backstack
                         navController.navigate(DestinasiHome.route) {
                             popUpTo(DestinasiLogin.route) { inclusive = true }
                         }
@@ -93,12 +119,10 @@ fun PengelolaHalaman(
                 RegisterScreen(
                     onRegisterSuccess = { navController.popBackStack() },
                     onNavigateBack = { navController.popBackStack() },
-                    // Callback navigasi ke Terms
                     onNavigateToTerms = { navController.navigate(DestinasiTerms.route) }
                 )
             }
 
-            // --- TERMS OF SERVICE (HALAMAN BARU) ---
             composable(DestinasiTerms.route) {
                 TermsOfServiceScreen(
                     navigateBack = { navController.popBackStack() }
@@ -159,6 +183,7 @@ fun PengelolaHalaman(
                         navController.navigate(DestinasiAbout.route)
                     },
                     onLogout = {
+                        // Saat logout, kembalikan ke Login dan hapus semua history
                         navController.navigate(DestinasiLogin.route) {
                             popUpTo(0) { inclusive = true }
                         }
@@ -178,7 +203,6 @@ fun PengelolaHalaman(
                 )
             }
 
-            // --- HALAMAN ABOUT ---
             composable(DestinasiAbout.route) {
                 AboutScreen(
                     navigateBack = { navController.popBackStack() }
