@@ -14,7 +14,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -44,7 +43,7 @@ fun HomeScreen(
 ) {
     val uiState = viewModel.homeUiState
 
-    // State Grid i
+    // State Grid
     val gridState = rememberLazyStaggeredGridState()
 
     // Infinite Scroll
@@ -65,7 +64,8 @@ fun HomeScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(PastelBluePrimary)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Spacer(modifier = Modifier.height(80.dp))
+            Spacer(modifier = Modifier.height(130.dp))
+
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
@@ -99,7 +99,6 @@ fun HomeScreen(
                                 verticalItemSpacing = 16.dp,
                                 modifier = Modifier.fillMaxSize()
                             ) {
-                                // Menjaga kestabilan item saat scroll/update
                                 items(viewModel.articles, key = { it.article_id }) { article ->
 
                                     val isTokohDunia = article.category_id == 2
@@ -125,12 +124,34 @@ fun HomeScreen(
             }
         }
 
+        // Header
         Row(
-            modifier = Modifier.fillMaxWidth().height(80.dp).padding(horizontal = 16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(130.dp)
+                .padding(horizontal = 16.dp)
+                .padding(top = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            Text(text = stringResource(R.string.home_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "The Grand",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+
+                Text(
+                    text = "Chronicler",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
         }
     }
 }
@@ -150,8 +171,8 @@ fun HybridArticleCard(
         Modifier.fillMaxWidth().height(280.dp)
     }
 
-    val badgeColor = if (isPinterestStyle) Color(0xFFFFF9C4) else PastelPinkContainer
-    val badgeBorder = if (isPinterestStyle) BorderStroke(1.dp, Color(0xFFFBC02D)) else null
+    // --- LOGIKA WARNA KATEGORI ---
+    val badgeColor = getCategoryColor(article.category_id)
 
     Card(
         modifier = sizeModifier.clickable { onClick() },
@@ -163,9 +184,7 @@ fun HybridArticleCard(
             if (thumbnailImage != null) {
                 val imgUrl = if (thumbnailImage.startsWith("http")) thumbnailImage else "http://10.0.2.2:3000/uploads/$thumbnailImage"
 
-                // 2. Modifier Gambar
                 val imageModifier = if (isPinterestStyle) {
-
                     Modifier
                         .fillMaxWidth()
                         .wrapContentHeight()
@@ -173,7 +192,6 @@ fun HybridArticleCard(
                 } else {
                     Modifier.fillMaxWidth().height(140.dp)
                 }
-
 
                 val contentScale = if (isPinterestStyle) ContentScale.FillWidth else ContentScale.Crop
 
@@ -188,10 +206,9 @@ fun HybridArticleCard(
                     model = request,
                     contentDescription = null,
                     contentScale = contentScale,
-                    modifier = imageModifier.background(Color(0xFFF5F5F5)) // Background abu tipis saat loading
+                    modifier = imageModifier.background(Color(0xFFF5F5F5))
                 )
             } else {
-                // Placeholder Teks jika tidak ada gambar
                 Box(modifier = Modifier.fillMaxWidth().height(140.dp).background(Color(0xFFEEEEEE)), contentAlignment = Alignment.Center) {
                     Text("No Image", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                 }
@@ -202,13 +219,13 @@ fun HybridArticleCard(
                 Surface(
                     color = badgeColor,
                     shape = RoundedCornerShape(6.dp),
-                    border = badgeBorder
+                    border = null
                 ) {
                     Text(
                         text = article.category_name ?: "Umum",
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        color = BlackText
+                        color = Color(0xFF4A4A4A)
                     )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -217,12 +234,29 @@ fun HybridArticleCard(
 
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(text = "Oleh: ${article.author_name ?: "Sejarawan"}", style = MaterialTheme.typography.bodySmall, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
 
-                // menampilkan cuplikan teks hanya untuk Pinterest Style
-                if (isPinterestStyle && article.content.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = article.content.take(60) + "...", style = MaterialTheme.typography.bodySmall, color = Color.Gray, lineHeight = 14.sp)
-                }
+// ---  WARNA KATEGORI ---
+fun getCategoryColor(categoryId: Int): Color {
+    return when (categoryId) {
+        1 -> Color(0xFFE3F2FD)
+        2 -> Color(0xFFFFF9C4)
+        3 -> Color(0xFFE8F5E9)
+        4 -> Color(0xFFFCE4EC)
+        5 -> Color(0xFFF3E5F5)
+        6 -> Color(0xFFFFF3E0)
+        else -> {
+            when (categoryId % 6) {
+                1 -> Color(0xFFE3F2FD)
+                2 -> Color(0xFFFFF9C4)
+                3 -> Color(0xFFE8F5E9)
+                4 -> Color(0xFFFCE4EC)
+                5 -> Color(0xFFF3E5F5)
+                0 -> Color(0xFFFFF3E0)
+                else -> Color(0xFFF5F5F5)
             }
         }
     }
