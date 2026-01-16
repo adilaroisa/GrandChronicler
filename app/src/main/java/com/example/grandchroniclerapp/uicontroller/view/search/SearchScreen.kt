@@ -6,11 +6,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,18 +23,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.example.grandchroniclerapp.model.Article
+import com.example.grandchroniclerapp.ui.theme.BlackText
 import com.example.grandchroniclerapp.ui.theme.PastelBluePrimary
 import com.example.grandchroniclerapp.viewmodel.provider.PenyediaViewModel
 import com.example.grandchroniclerapp.viewmodel.search.SearchUiState
@@ -46,14 +50,18 @@ fun SearchScreen(
     val focusManager = LocalFocusManager.current
     val uiState = viewModel.searchUiState
 
-    // Handle initial query (dari Tag)
     LaunchedEffect(initialQuery) {
         if (!initialQuery.isNullOrBlank()) {
             viewModel.updateQuery(initialQuery)
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp)
+            .padding(top = 16.dp)
+    ) {
         // --- SEARCH BAR ---
         OutlinedTextField(
             value = viewModel.searchQuery,
@@ -64,51 +72,79 @@ fun SearchScreen(
                 else
                     Text("Cari Artikel Sejarah...")
             },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            leadingIcon = { Icon(Icons.Default.Search, null, tint = PastelBluePrimary) },
             trailingIcon = {
                 if (viewModel.searchQuery.isNotEmpty() || viewModel.selectedCategory != null) {
                     IconButton(onClick = {
                         viewModel.clearSearch()
                         focusManager.clearFocus()
                     }) {
-                        Icon(Icons.Default.Close, contentDescription = "Hapus")
+                        Icon(Icons.Default.Close, null, tint = Color.Gray)
                     }
                 }
             },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = PastelBluePrimary,
+                unfocusedBorderColor = Color.LightGray
+            ),
             keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(16.dp))
 
-        // --- KONTEN UTAMA ---
+        // --- CONTENT ---
         when (uiState) {
             is SearchUiState.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = PastelBluePrimary)
                 }
             }
-            is SearchUiState.Error -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(text = uiState.message, color = MaterialTheme.colorScheme.error)
+
+            // TAMPILAN PILIH KATEGORI
+            is SearchUiState.Idle -> {
+                Text("Jelajahi Kategori", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = BlackText)
+                Spacer(Modifier.height(12.dp))
+
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(viewModel.categories.filter { it.category_id != 7 }) { cat ->
+                        Card(
+                            onClick = { viewModel.selectCategory(cat) },
+                            modifier = Modifier.height(60.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (viewModel.selectedCategory == cat) PastelBluePrimary else Color(0xFFFFE0E0)
+                            )
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    cat.category_name,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (viewModel.selectedCategory == cat) Color.White else Color(0xFF4A4A4A)
+                                )
+                            }
+                        }
+                    }
                 }
             }
-            is SearchUiState.Success -> {
-                // HEADER HASIL
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
-                    val headerText = if (viewModel.selectedCategory != null)
-                        "Kategori: ${viewModel.selectedCategory!!.category_name}"
-                    else
-                        "Hasil Pencarian:"
 
+            // HASIL PENCARIAN
+            is SearchUiState.Success -> {
+                // Header Hasil
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+                    val headerText = if (viewModel.selectedCategory != null) "Kategori: ${viewModel.selectedCategory!!.category_name}" else "Hasil Pencarian:"
                     Text(text = headerText, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
 
                 if (uiState.articles.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.Search, null, tint = Color.Gray, modifier = Modifier.size(50.dp))
                             Spacer(Modifier.height(8.dp))
@@ -116,109 +152,150 @@ fun SearchScreen(
                         }
                     }
                 } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
+                    LazyVerticalStaggeredGrid(
+                        columns = StaggeredGridCells.Fixed(2),
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalItemSpacing = 16.dp,
+                        contentPadding = PaddingValues(bottom = 100.dp),
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        items(uiState.articles) { article ->
-                            SearchArticleCard(
+                        items(uiState.articles, key = { it.article_id }) { article ->
+                            val isPinterestStyle = article.category_id == 2
+
+                            SearchStaggeredCard(
                                 article = article,
-                                searchQuery = viewModel.searchQuery,
+                                isPinterestStyle = isPinterestStyle,
                                 onClick = { onDetailClick(article.article_id) }
                             )
                         }
                     }
                 }
             }
-            is SearchUiState.Idle -> {
-                // --- KATEGORI GRID ---
-                Text(text = "Jelajahi Kategori", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(12.dp))
 
-                if (viewModel.categories.isEmpty()) {
-                    Text("Memuat kategori...", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // FIX: Filter ID 7 (Tanpa Kategori) agar tidak muncul di sini
-                        items(viewModel.categories.filter { it.category_id != 7 }) { category ->
-                            CategoryCard(categoryName = category.category_name) {
-                                viewModel.selectCategory(category)
-                            }
-                        }
-                    }
+            is SearchUiState.Error -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(uiState.message, color = Color.Red)
                 }
             }
         }
     }
 }
 
-// --- KOMPONEN PENDUKUNG ---
 @Composable
-fun CategoryCard(categoryName: String, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFE0E0)),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.height(60.dp).fillMaxWidth()
-    ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(text = categoryName, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color(0xFF4A4A4A))
-        }
-    }
-}
+fun SearchStaggeredCard(
+    article: Article,
+    isPinterestStyle: Boolean,
+    onClick: () -> Unit
+) {
+    val thumbnailImage = article.images.firstOrNull() ?: article.image
 
-@Composable
-fun SearchArticleCard(article: Article, searchQuery: String, onClick: () -> Unit) {
+    val sizeModifier = if (isPinterestStyle) {
+        Modifier.fillMaxWidth().wrapContentHeight()
+    } else {
+        Modifier.fillMaxWidth().height(260.dp)
+    }
+
+    val badgeColor = getCategoryColor(article.category_id)
+
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        modifier = sizeModifier.clickable { onClick() },
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp)
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column {
-            if (article.images.isNotEmpty()) {
-                val imgUrl = if (article.images[0].startsWith("http")) article.images[0] else "http://10.0.2.2:3000/uploads/${article.images[0]}"
-                AsyncImage(model = imgUrl, contentDescription = null, modifier = Modifier.fillMaxWidth().height(100.dp), contentScale = ContentScale.Crop)
-            } else {
-                Box(modifier = Modifier.fillMaxWidth().height(100.dp).background(Color.LightGray))
-            }
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(text = article.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (thumbnailImage != null) {
+                val imgUrl = if (thumbnailImage.startsWith("http")) thumbnailImage else "http://10.0.2.2:3000/uploads/$thumbnailImage"
 
-                if (searchQuery.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    val snippet = remember(article.content, searchQuery) { generateSearchSnippet(article.content, searchQuery) }
-                    Text(text = snippet, style = MaterialTheme.typography.bodySmall, fontSize = 11.sp, color = Color.Gray, maxLines = 3, overflow = TextOverflow.Ellipsis, lineHeight = 14.sp)
+                val imageModifier = if (isPinterestStyle) {
+                    Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .heightIn(min = 120.dp)
+                } else {
+                    Modifier.fillMaxWidth().height(140.dp)
+                }
+
+                val contentScale = if (isPinterestStyle) ContentScale.FillWidth else ContentScale.Crop
+
+                val request = ImageRequest.Builder(LocalContext.current)
+                    .data(imgUrl)
+                    .crossfade(true)
+                    .diskCachePolicy(CachePolicy.ENABLED)
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .build()
+
+                AsyncImage(
+                    model = request,
+                    contentDescription = null,
+                    contentScale = contentScale,
+                    modifier = imageModifier.background(Color(0xFFF5F5F5))
+                )
+            } else {
+                Box(modifier = Modifier.fillMaxWidth().height(140.dp).background(Color(0xFFEEEEEE)), contentAlignment = Alignment.Center) {
+                    Text("No Image", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            Column(modifier = Modifier.padding(12.dp)) {
+
+                // Badge Kategori dengan warna dinamis
+                Surface(color = badgeColor, shape = RoundedCornerShape(6.dp)) {
+                    Text(
+                        text = article.category_name ?: "Umum",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        color = Color(0xFF4A4A4A)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = article.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = BlackText,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Person, null, modifier = Modifier.size(12.dp), tint = Color.Gray)
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = article.author_name ?: "Sejarawan",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
     }
 }
 
-fun generateSearchSnippet(content: String, query: String): androidx.compose.ui.text.AnnotatedString {
-    if (query.isBlank()) return buildAnnotatedString { append(content.take(80) + "...") }
-    val index = content.indexOf(query, ignoreCase = true)
-    if (index == -1) return buildAnnotatedString { append(content.take(80) + "...") }
-    val start = maxOf(0, index - 30)
-    val end = minOf(content.length, index + query.length + 50)
-    val snippetRaw = content.substring(start, end)
-    return buildAnnotatedString {
-        if (start > 0) append("... ")
-        val relativeIndex = snippetRaw.indexOf(query, ignoreCase = true)
-        if (relativeIndex != -1) {
-            append(snippetRaw.substring(0, relativeIndex))
-            withStyle(style = SpanStyle(fontWeight = FontWeight.ExtraBold, color = PastelBluePrimary, background = Color(0xFFE3F2FD))) {
-                append(snippetRaw.substring(relativeIndex, relativeIndex + query.length))
+fun getCategoryColor(categoryId: Int): Color {
+    return when (categoryId) {
+        1 -> Color(0xFFE3F2FD)
+        2 -> Color(0xFFFFF9C4)
+        3 -> Color(0xFFE8F5E9)
+        4 -> Color(0xFFFCE4EC)
+        5 -> Color(0xFFF3E5F5)
+        6 -> Color(0xFFFFF3E0)
+        else -> {
+            when (categoryId % 6) {
+                1 -> Color(0xFFE3F2FD)
+                2 -> Color(0xFFFFF9C4)
+                3 -> Color(0xFFE8F5E9)
+                4 -> Color(0xFFFCE4EC)
+                5 -> Color(0xFFF3E5F5)
+                0 -> Color(0xFFFFF3E0)
+                else -> Color(0xFFF5F5F5)
             }
-            append(snippetRaw.substring(relativeIndex + query.length))
-        } else {
-            append(snippetRaw)
         }
-        if (end < content.length) append("...")
     }
 }
